@@ -1,0 +1,4 @@
+.env
+ssl/
+!ssl/mqtt/placeholder
+!ssl/proxy/placeholder

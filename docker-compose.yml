@@ -1,0 +1,388 @@
+name: datahub
+
+services:
+  config-make:
+    image: test-dcreg.icool.cloud/data-config:latest
+    container_name: energo-config-make
+    environment:
+      DOMAIN_SUFFIX: ${DOMAIN_SUFFIX:-docker.localhost}
+    command: make
+    volumes:
+      - ./:/srv/shared
+    networks:
+      - energo
+    restart: no
+    profiles:
+      - config
+  config:
+    image: test-dcreg.icool.cloud/data-config:latest
+    container_name: energo-config
+    volumes:
+      - ./:/srv/shared
+    networks:
+      - energo
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:5000/healthcheck || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.config.rule=Host(`config.${DOMAIN_SUFFIX:-docker.localhost}`)"
+      - "traefik.http.routers.config.entrypoints=websecure"
+      - "traefik.http.routers.config.tls=true"
+      - "traefik.http.middlewares.config-basicauth.basicauth.users=${ENERGO__CONFIG__HTPASSWD:-energo:missingpasswd}"
+      - "traefik.http.middlewares.config-basicauth.basicauth.realm=DataHub"
+      - "traefik.http.routers.config.middlewares=config-basicauth@docker"
+    restart: no
+    profiles:
+      - base
+  postgres:
+    image: timescale/timescaledb:2.22.0-pg16
+    container_name: energo-database
+    environment:
+      # let's keep postgres as admin user
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      # api user will be used by data-api
+      ENERGO_POSTGRES__DATA_API__USERNAME: ${ENERGO_POSTGRES__DATA_API__USERNAME:-api}
+      ENERGO_POSTGRES__DATA_API__PASSWORD: ${ENERGO_POSTGRES__DATA_API__PASSWORD:-api}
+      ENERGO_POSTGRES__DATA_API__DATABASE: ${ENERGO_POSTGRES__DATA_API__DATABASE:-api}
+      # logger user will be used for data-api and data-subscriber
+      ENERGO_POSTGRES__DATA_LOGGER__USERNAME: ${ENERGO_POSTGRES__DATA_LOGGER__USERNAME:-logger}
+      ENERGO_POSTGRES__DATA_LOGGER__PASSWORD: ${ENERGO_POSTGRES__DATA_LOGGER__PASSWORD:-logger}
+      ENERGO_POSTGRES__DATA_LOGGER__DATABASE: ${ENERGO_POSTGRES__DATA_LOGGER__DATABASE:-logger}
+      # mqtt user is for accessing mqtt credentials table
+      ENERGO_POSTGRES__MQTT__USERNAME: ${ENERGO_POSTGRES__MQTT__USERNAME:-mqtt}
+      ENERGO_POSTGRES__MQTT__PASSWORD: ${ENERGO_POSTGRES__MQTT__PASSWORD:-mqtt}
+      ENERGO_POSTGRES__MQTT__DATABASE: ${ENERGO_POSTGRES__MQTT__DATABASE:-mqtt}
+      # grafana user has read-only access to the data logger database
+      ENERGO_POSTGRES__GRAFANA__USERNAME: ${ENERGO_POSTGRES__GRAFANA__USERNAME:-grafana}
+      ENERGO_POSTGRES__GRAFANA__PASSWORD: ${ENERGO_POSTGRES__GRAFANA__PASSWORD:-grafana}
+      # ts options
+      TIMESCALEDB_TELEMETRY: "off"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$ENERGO_POSTGRES__DATA_API__DATABASE"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./db/init/energo-setup.sh:/docker-entrypoint-initdb.d/999_energo-setup.sh:ro
+    networks:
+      - energo
+    profiles:
+      - base
+  mqtt:
+    image: vernemq/vernemq:2.1.1
+    container_name: energo-mqtt
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DOCKER_VERNEMQ_ACCEPT_EULA: yes
+      DOCKER_VERNEMQ_ALLOW_ANONYMOUS: off
+      DOCKER_VERNEMQ_PLUGINS__VMQ_PASSWD: off
+      DOCKER_VERNEMQ_PLUGINS__VMQ_ACL: off
+      DOCKER_VERNEMQ_PLUGINS__VMQ_DIVERSITY: on
+      DOCKER_VERNEMQ_VMQ_DIVERSITY__AUTH_POSTGRES__ENABLED: on
+      DOCKER_VERNEMQ_VMQ_DIVERSITY__POSTGRES__HOST: postgres
+      DOCKER_VERNEMQ_VMQ_DIVERSITY__POSTGRES__PORT: 5432
+      DOCKER_VERNEMQ_VMQ_DIVERSITY__POSTGRES__USER: ${ENERGO_POSTGRES__MQTT__USERNAME:-mqtt}
+      DOCKER_VERNEMQ_VMQ_DIVERSITY__POSTGRES__PASSWORD: ${ENERGO_POSTGRES__MQTT__PASSWORD:-mqtt}
+      DOCKER_VERNEMQ_VMQ_DIVERSITY__POSTGRES__DATABASE: ${ENERGO_POSTGRES__MQTT__DATABASE:-mqtt}
+      DOCKER_VERNEMQ_VMQ_DIVERSITY__POSTGRES__PASSWORD_HASH_METHOD: crypt
+      DOCKER_VERNEMQ_LISTENER__TCP__DEFAULT: 0.0.0.0:1883
+      DOCKER_VERNEMQ_LOG__CONSOLE__LEVEL: info
+      DOCKER_VERNEMQ_LISTENER__HTTP__DEFAULT: 0.0.0.0:8888
+      DOCKER_VERNEMQ_LISTENER__HTTP__DEFAULT__HTTP_MODULES: vmq_status_http, vmq_health_http, vmq_metrics_http
+#      DOCKER_VERNEMQ_PERSISTENT_CLIENT_EXPIRATION: 24h
+#      DOCKER_VERNEMQ_MAX_OFFLINE_MESSAGES: -1
+#      DOCKER_VERNEMQ_MAX_ONLINE_MESSAGES: -1
+#      DOCKER_VERNEMQ_QUEUE_DELIVER_MODE: fanout
+#      DOCKER_VERNEMQ_RETRY_INTERVAL: 20s
+    volumes:
+      - mqtt_data:/vernemq/data
+      - mqtt_log:/vernemq/log
+      - mqtt_etc:/vernemq/etc
+    networks:
+      - energo
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mqtt.rule=Host(`mqtt.${DOMAIN_SUFFIX:-docker.localhost}`)"
+      - "traefik.http.routers.mqtt.entrypoints=websecure"
+      - "traefik.http.routers.mqtt.tls=true"
+      - "traefik.http.services.mqtt-datahub.loadbalancer.server.port=8888"
+      - "traefik.http.middlewares.mqtt-basicauth.basicauth.users=${ENERGO__MQTT__HTPASSWD:-energo:missingpasswd}"
+      - "traefik.http.middlewares.mqtt-basicauth.basicauth.realm=DataHub-MQTT"
+      - "traefik.http.routers.mqtt.middlewares=mqtt-basicauth@docker"
+      - "traefik.tcp.routers.mqtts.rule=HostSNI(`mqtt.${DOMAIN_SUFFIX:-docker.localhost}`)"
+      - "traefik.tcp.routers.mqtts.entrypoints=mqtts"
+      - "traefik.tcp.routers.mqtts.tls=true"
+      - "traefik.tcp.services.mqtts.loadbalancer.server.port=1883"
+    profiles:
+      - base
+  api:
+    image: test-dcreg.icool.cloud/data-api:latest
+    container_name: energo-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ALLOWED_HOST: api.${DOMAIN_SUFFIX:-docker.localhost}
+      SECRET_KEY: ${ENERGO__DATA_API__SECRET_KEY:-secret}
+      MANAGE_API_TOKEN: ${ENERGO__DATA_API__MANAGE_API_TOKEN:-secretmanagetoken}
+      API_DATABASE_HOST: postgres
+      API_DATABASE_NAME: ${ENERGO_POSTGRES__DATA_API__DATABASE:-api}
+      API_DATABASE_USER: ${ENERGO_POSTGRES__DATA_API__USERNAME:-api}
+      API_DATABASE_PASS: ${ENERGO_POSTGRES__DATA_API__PASSWORD:-api}
+      LOGGER_DATABASE_HOST: postgres
+      LOGGER_DATABASE_NAME: ${ENERGO_POSTGRES__DATA_LOGGER__DATABASE:-logger}
+      LOGGER_DATABASE_USER: ${ENERGO_POSTGRES__DATA_LOGGER__USERNAME:-logger}
+      LOGGER_DATABASE_PASS: ${ENERGO_POSTGRES__DATA_LOGGER__PASSWORD:-logger}
+      MQTT_DATABASE_HOST: postgres
+      MQTT_DATABASE_NAME: ${ENERGO_POSTGRES__MQTT__DATABASE:-mqtt}
+      MQTT_DATABASE_USER: ${ENERGO_POSTGRES__MQTT__USERNAME:-mqtt}
+      MQTT_DATABASE_PASS: ${ENERGO_POSTGRES__MQTT__PASSWORD:-mqtt}
+      MQTT_USERNAME: ${ENERGO__MQTT__USERNAME:-subscriber}
+      MQTT_PASSWORD: ${ENERGO__MQTT__PASSWORD:-password}
+    networks:
+      - energo
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/api/v1/healthcheck || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api.rule=Host(`api.${DOMAIN_SUFFIX:-docker.localhost}`)"
+      - "traefik.http.routers.api.entrypoints=websecure"
+      - "traefik.http.routers.api.tls=true"
+    profiles:
+      - base
+  collectstatic:
+    image: test-dcreg.icool.cloud/data-api:latest
+    container_name: energo-collectstatic
+    depends_on:
+      api:
+        condition: service_healthy
+    command: collectstatic --noinput
+    environment:
+      SECRET_KEY: ${ENERGO__DATA_API__SECRET_KEY:-secret}
+      API_DATABASE_NAME: ${ENERGO_POSTGRES__DATA_API__DATABASE:-api}
+      API_DATABASE_USER: ${ENERGO_POSTGRES__DATA_API__USERNAME:-api}
+      API_DATABASE_PASSWORD: ${ENERGO_POSTGRES__DATA_API__PASSWORD:-api}
+      API_DATABASE_HOST: postgres
+    volumes:
+      - static_files:/srv/static
+    networks:
+      - energo
+    restart: "no"
+    profiles:
+      - base
+  subscriber:
+    image: test-dcreg.icool.cloud/data-subscriber:latest
+    container_name: energo-subscriber
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mqtt:
+        condition: service_started
+    environment:
+      MQTT_HOST: mqtt
+      MQTT_USERNAME: ${ENERGO__MQTT__USERNAME:-subscriber}
+      MQTT_PASSWORD: ${ENERGO__MQTT__PASSWORD:-password}
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_NAME: ${ENERGO_POSTGRES__DATA_LOGGER__DATABASE:-logger}
+      DATABASE_USER: ${ENERGO_POSTGRES__DATA_LOGGER__USERNAME:-logger}
+      DATABASE_PASS: ${ENERGO_POSTGRES__DATA_LOGGER__PASSWORD:-logger}
+      EXTERNAL_CHECK_URL: "http://gatus:8080/api/v1/endpoints/services_data-subscriber/external"
+      EXTERNAL_CHECK_TOKEN: ${ENERGO_EXTERNAL_CHECK_TOKEN_DATA_SUBSCRIBER:-bflmpsvz}
+    networks:
+      - energo
+    restart: unless-stopped
+    profiles:
+      - base
+  grafana:
+    image: grafana/grafana:12.3.0-17782621999
+    container_name: energo-grafana
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      ENERGO_POSTGRES_HOST: postgres
+      ENERGO_POSTGRES__DATA_LOGGER__DATABASE: ${ENERGO_POSTGRES__DATA_LOGGER__DATABASE:-logger}
+      ENERGO_POSTGRES__GRAFANA__USERNAME: ${ENERGO_POSTGRES__GRAFANA__USERNAME:-grafana}
+      ENERGO_POSTGRES__GRAFANA__PASSWORD: ${ENERGO_POSTGRES__GRAFANA__PASSWORD:-grafana}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - energo
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.${DOMAIN_SUFFIX:-docker.localhost}`)"
+      - "traefik.http.routers.grafana.entrypoints=websecure"
+      - "traefik.http.routers.grafana.tls=true"
+    profiles:
+      - base
+  gatus:
+    image: twinproduction/gatus:v5.24.0
+    container_name: energo-status
+    environment:
+      GSTATUS_CONFIG_FILE: /config/config.yaml
+      DOMAIN_SUFFIX: ${DOMAIN_SUFFIX:-docker.localhost}
+      POSTGRES_HOST: postgres
+      MQTT_BROKER_HOST: mqtt
+      DATA_API_HOST: api
+      STATIC_HOST: static
+      GRAFANA_HOST: grafana
+      CONFIG_HOST: config
+      EXTERNAL_CHECK_TOKEN_DATA_SUBSCRIBER: ${ENERGO_EXTERNAL_CHECK_TOKEN_DATA_SUBSCRIBER:-bflmpsvz}
+      GATUS_DELAY_START_SECONDS: 60
+    volumes:
+      - ./gatus/config.yaml:/config/config.yaml
+      - gatus_data:/data/
+    networks:
+      - energo
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.gatus.rule=Host(`status.${DOMAIN_SUFFIX:-docker.localhost}`)"
+      - "traefik.http.routers.gatus.entrypoints=websecure"
+      - "traefik.http.routers.gatus.tls=true"
+    profiles:
+      - monitoring
+  traefik:
+    image: traefik:v3.6
+    container_name: energo-proxy
+    restart: unless-stopped
+    command:
+      # EntryPoints
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.websecure.http.tls=true"
+      - "--entrypoints.mqtts.address=:8883"
+
+      # Attach the static configuration tls.yaml file that contains the tls configuration settings
+      - "--providers.file.filename=/dynamic/tls.yaml"
+
+      # Providers
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=energo"
+
+      # API & Dashboard
+      - "--api.dashboard=true"
+      - "--api.insecure=false"
+
+      # Observability
+      - "--log.level=INFO"
+      - "--accesslog=true"
+      - "--metrics.prometheus=true"
+    ports:
+      - "${ENERGO__PROXY__PUBLIC_PORT:-443}:443"
+      - "${ENERGO__PROXY__MQTT__PUBLIC_PORT:-8883}:8883"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./ssl:/certs:ro
+      - ./traefik/dynamic:/dynamic:ro
+      - static_files:/staticfiles:ro
+    networks:
+      - energo
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dashboard.rule=Host(`proxy.${DOMAIN_SUFFIX:-docker.localhost}`)"
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.tls=true"
+      - "traefik.http.middlewares.dashboard-auth.basicauth.users=${ENERGO__PROXY__HTPASSWD:-energo:missingpasswd}"
+      - "traefik.http.routers.dashboard.middlewares=dashboard-auth@docker"
+    profiles:
+      - base
+  static:
+    image: nginx:1-alpine
+    container_name: energo-static
+    volumes:
+      - static_files:/usr/share/nginx/html/static:ro
+    networks:
+      - energo
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.static.rule=Host(`api.${DOMAIN_SUFFIX:-docker.localhost}`) && PathPrefix(`/static`)"
+      - "traefik.http.routers.static.entrypoints=websecure"
+      - "traefik.http.routers.static.tls=true"
+    profiles:
+      - base
+  exporter-postgres:
+    image: quay.io/prometheuscommunity/postgres-exporter
+    container_name: energo-postgres-exporter
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_URI: "postgres:5432/postgres?sslmode=disable"
+      DATA_SOURCE_USER: ${POSTGRES_USER:-postgres}
+      DATA_SOURCE_PASS: ${POSTGRES_PASSWORD:-postgres}
+    networks:
+      - energo
+    profiles:
+      - monitoring
+  prometheus:
+    image: prom/prometheus:v3.7.1
+    container_name: energo-prometheus
+    restart: unless-stopped
+#    environment:
+#      POSTGRES_HOST: postgres
+    volumes:
+      - ./prometheus/prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
+      - prometheus_data:/prometheus
+#    entrypoint: |
+#      sh -c '
+#        envsubst < /etc/prometheus/prometheus.yml.template > /etc/prometheus/prometheus.yml &&
+#        exec /bin/prometheus
+#      '
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+    profiles:
+      - monitoring
+  adminer:
+    image: adminer:standalone
+    container_name: energo-adminer
+    restart: always
+    networks:
+      - energo
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.adminer.rule=Host(`adminer.${DOMAIN_SUFFIX:-docker.localhost}`)"
+      - "traefik.http.routers.adminer.entrypoints=websecure"
+      - "traefik.http.routers.adminer.tls=true"
+    profiles:
+      - debug
+
+volumes:
+  pg_data:
+  grafana_data:
+  mqtt_data:
+  mqtt_log:
+  mqtt_etc:
+  gatus_data:
+  prometheus_data:
+  static_files:
+
+networks:
+  energo:
+    name: energo
+    driver: bridge

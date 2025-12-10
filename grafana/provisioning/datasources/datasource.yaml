@@ -1,0 +1,34 @@
+apiVersion: 1
+
+datasources:
+  - name: TimescaleDB
+    type: postgres
+    access: proxy
+    isDefault: true
+    url: "${ENERGO_POSTGRES_HOST}:5432"
+    database: "${ENERGO_POSTGRES__DATA_LOGGER__DATABASE}"
+    user: "${ENERGO_POSTGRES__GRAFANA__USERNAME}"
+    secureJsonData:
+      password: "${ENERGO_POSTGRES__GRAFANA__PASSWORD}"
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1500
+      timescaledb: true
+      searchPath: "public"
+      database: "${ENERGO_POSTGRES__DATA_LOGGER__DATABASE}"
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    basicAuth: false
+    isDefault: false
+    version: 1
+    editable: false
+  - name: Prometheus
+    type: prometheus
+    orgId: 1
+    url: http://prometheus:9090
+    basicAuth: false
+    isDefault: false
+    version: 1
+    editable: false

@@ -1,0 +1,65 @@
+storage:
+  type: sqlite
+  path: /data/data.db
+
+ui:
+  title: "Energotation monitoring"
+  description: ""
+  header: "Energostation DataHub"
+#  logo: "https://example.com/logo.png"     # Custom logo URL
+#  link: "https://example.com"              # Logo click destination
+  dark-mode: false
+  default-sort-by: group
+
+endpoints:
+  - name: timeseries-database
+    group: services
+    url: "tcp://${POSTGRES_HOST}:5432"
+    interval: 30s
+    conditions:
+      - "[CONNECTED] == true"
+  - name: mqtt-broker
+    group: services
+    url: "tcp://${MQTT_BROKER_HOST}:1883"
+    interval: 30s
+    conditions:
+      - "[CONNECTED] == true"
+  - name: data-api
+    group: services
+    url: "http://${DATA_API_HOST}:8000/api/v1/healthcheck/"
+    interval: 30s
+    conditions:
+      - "[STATUS] == 200"
+  - name: static
+    group: services
+    url: "http://${STATIC_HOST}/"
+    interval: 30s
+    conditions:
+      - "[STATUS] == 200"
+  - name: grafana
+    group: services
+    url: "http://${GRAFANA_HOST}:3000/api/health"
+    interval: 30s
+    conditions:
+      - "[STATUS] == 200"
+  - name: mqtt-broker-ssl
+    group: certificates
+    url: "tls://mqtt.${DOMAIN_SUFFIX}:8883"
+    interval: 30s
+    client:
+      insecure: true
+    conditions:
+      - "[CERTIFICATE_EXPIRATION] > 96h"
+  - name: config
+    group: system
+    url: "http://${CONFIG_HOST}:5000/healthcheck"
+    interval: 30s
+    conditions:
+      - "[STATUS] == 200"
+
+external-endpoints:
+  - name: data-subscriber
+    type: EXTERNAL
+    group: services
+    interval: 30s
+    token: "${EXTERNAL_CHECK_TOKEN_DATA_SUBSCRIBER}"

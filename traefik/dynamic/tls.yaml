@@ -1,0 +1,6 @@
+tls:
+  certificates:
+    - certFile: /certs/proxy/server.crt
+      keyFile:  /certs/proxy/server.key
+    - certFile: /certs/mqtt/server.crt
+      keyFile:  /certs/mqtt/server.key
