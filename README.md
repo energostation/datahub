@@ -40,15 +40,21 @@ docker network create energo
 ```
 to create an external network for services.
 
-Then create `.env` file and generate certificates:
+Then create `.env` file and generate certificates.
+
+Use ENV `DOMAIN_SUFFIX=docker.localhost` for custom domain suffix.
+Note that it is the suffix part, whole DNS name will look like `api.docker.localhost`.
+
 ```shell
+export DOMAIN_SUFFIX=docker.localhost
 docker-compose -f datahub-core.yml --profile=config up
 ```
 
 #### Running services
 
 ```shell
-docker-compose -f datahub-services.yml --profile=base up
+docker-compose -f datahub-core.yml --profile=base up -d
+docker-compose -f datahub-services.yml --profile=base up -d
 ```
 
 this will start core services:
