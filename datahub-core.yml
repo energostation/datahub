@@ -8,7 +8,7 @@ services:
       DOMAIN_SUFFIX: ${DOMAIN_SUFFIX:-docker.localhost}
     command: make
     volumes:
-      - ./:/srv/shared
+      - ./:/srv/datahub
     networks:
       - energo
     restart: no
