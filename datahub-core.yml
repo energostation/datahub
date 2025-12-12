@@ -15,7 +15,7 @@ services:
     profiles:
       - config
   config:
-    image: data-config:latest
+    image: test-dcreg.icool.cloud/data-config:latest
     container_name: energo-config
     volumes:
       - ./:/srv/datahub
