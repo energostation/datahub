@@ -1,4 +1,6 @@
 .env
+.config.credentials
 ssl/
 !ssl/mqtt/placeholder
 !ssl/proxy/placeholder
+config-backups/

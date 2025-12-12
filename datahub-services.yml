@@ -1,43 +1,6 @@
 name: datahub
 
 services:
-  config-make:
-    image: test-dcreg.icool.cloud/data-config:latest
-    container_name: energo-config-make
-    environment:
-      DOMAIN_SUFFIX: ${DOMAIN_SUFFIX:-docker.localhost}
-    command: make
-    volumes:
-      - ./:/srv/shared
-    networks:
-      - energo
-    restart: no
-    profiles:
-      - config
-  config:
-    image: test-dcreg.icool.cloud/data-config:latest
-    container_name: energo-config
-    volumes:
-      - ./:/srv/shared
-    networks:
-      - energo
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:5000/healthcheck || exit 1"]
-      interval: 10s
-      timeout: 3s
-      retries: 10
-      start_period: 10s
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.config.rule=Host(`config.${DOMAIN_SUFFIX:-docker.localhost}`)"
-      - "traefik.http.routers.config.entrypoints=websecure"
-      - "traefik.http.routers.config.tls=true"
-      - "traefik.http.middlewares.config-basicauth.basicauth.users=${ENERGO__CONFIG__HTPASSWD:-energo:missingpasswd}"
-      - "traefik.http.middlewares.config-basicauth.basicauth.realm=DataHub"
-      - "traefik.http.routers.config.middlewares=config-basicauth@docker"
-    restart: no
-    profiles:
-      - base
   postgres:
     image: timescale/timescaledb:2.22.0-pg16
     container_name: energo-database
@@ -98,6 +61,8 @@ services:
       DOCKER_VERNEMQ_LOG__CONSOLE__LEVEL: info
       DOCKER_VERNEMQ_LISTENER__HTTP__DEFAULT: 0.0.0.0:8888
       DOCKER_VERNEMQ_LISTENER__HTTP__DEFAULT__HTTP_MODULES: vmq_status_http, vmq_health_http, vmq_metrics_http
+#      DOCKER_VERNEMQ_METADATA_PLUGIN: vmq_swc
+#      DOCKER_VERNEMQ_VMQ_SWC__ENABLED: off
 #      DOCKER_VERNEMQ_PERSISTENT_CLIENT_EXPIRATION: 24h
 #      DOCKER_VERNEMQ_MAX_OFFLINE_MESSAGES: -1
 #      DOCKER_VERNEMQ_MAX_ONLINE_MESSAGES: -1
@@ -259,56 +224,6 @@ services:
       - "traefik.http.routers.gatus.tls=true"
     profiles:
       - monitoring
-  traefik:
-    image: traefik:v3.6
-    container_name: energo-proxy
-    restart: unless-stopped
-    command:
-      # EntryPoints
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
-      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
-      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
-      - "--entrypoints.websecure.address=:443"
-      - "--entrypoints.websecure.http.tls=true"
-      - "--entrypoints.mqtts.address=:8883"
-
-      # Attach the static configuration tls.yaml file that contains the tls configuration settings
-      - "--providers.file.filename=/dynamic/tls.yaml"
-
-      # Providers
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--providers.docker.network=energo"
-
-      # API & Dashboard
-      - "--api.dashboard=true"
-      - "--api.insecure=false"
-
-      # Observability
-      - "--log.level=INFO"
-      - "--accesslog=true"
-      - "--metrics.prometheus=true"
-    ports:
-      - "${ENERGO__PROXY__PUBLIC_PORT:-443}:443"
-      - "${ENERGO__PROXY__MQTT__PUBLIC_PORT:-8883}:8883"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./ssl:/certs:ro
-      - ./traefik/dynamic:/dynamic:ro
-      - static_files:/staticfiles:ro
-    networks:
-      - energo
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.dashboard.rule=Host(`proxy.${DOMAIN_SUFFIX:-docker.localhost}`)"
-      - "traefik.http.routers.dashboard.entrypoints=websecure"
-      - "traefik.http.routers.dashboard.service=api@internal"
-      - "traefik.http.routers.dashboard.tls=true"
-      - "traefik.http.middlewares.dashboard-auth.basicauth.users=${ENERGO__PROXY__HTPASSWD:-energo:missingpasswd}"
-      - "traefik.http.routers.dashboard.middlewares=dashboard-auth@docker"
-    profiles:
-      - base
   static:
     image: nginx:1-alpine
     container_name: energo-static
@@ -386,3 +301,4 @@ networks:
   energo:
     name: energo
     driver: bridge
+    external: true

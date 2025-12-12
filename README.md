@@ -33,18 +33,22 @@ The MQTT broker and HTTP proxy use custom CA.
 
 ### Docker
 
-For basic initial setup run
+#### Initial setup run
 
 ```shell
-docker-compose --profile=config up
+docker network create energo
+```
+to create an external network for services.
+
+Then create `.env` file and generate certificates:
+```shell
+docker-compose -f datahub-core.yml --profile=config up
 ```
 
-This will create `.env` file and generate certificates.
-
-Then run
+#### Running services
 
 ```shell
-docker-compose --profile=base up
+docker-compose -f datahub-services.yml --profile=base up
 ```
 
 this will start core services:
@@ -57,7 +61,7 @@ this will start core services:
 
 For monitoring services run
 ```shell
-docker-compose --profile=base --profile=monitoring up
+docker-compose -f datahub-services.yml --profile=base --profile=monitoring up
 ```
 
 this will also start:
@@ -67,7 +71,7 @@ this will also start:
 
 For debug tools run
 ```shell
-docker-compose --profile=base --profile=monitoring  --profile=debug up
+docker-compose -f datahub-services.yml --profile=base --profile=monitoring  --profile=debug up
 ```
 
 this will also start:
@@ -88,6 +92,9 @@ this will also start:
 Acessing services is possible via `docker.localhost` domain.
 
 MQTT broker is exposed on port `8883` with TLS through the TCP proxy, so correct SNI must be used.
+
+- `mqtt.docker.localhost:8883`
+
 However, it can be accessed directly on port `1883` via IP address. 
 ```shell
 docker inspect energo-mqtt | jq -r '.[].NetworkSettings.Networks.energo.IPAddress'
