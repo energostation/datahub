@@ -20,6 +20,9 @@ services:
     volumes:
       - ./:/srv/datahub
       - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      DATA_API_TOKEN: ${ENERGO__DATA_API__MANAGE_API_TOKEN:-secretmanagetoken}
+      DATA_API_URL: "https://api.${DOMAIN_SUFFIX:-docker.localhost}"
     networks:
       - energo
     healthcheck:
