@@ -15,7 +15,7 @@ services:
     profiles:
       - config
   config:
-    image: test-dcreg.icool.cloud/data-config:latest
+    image: data-config:latest
     container_name: energo-config
     volumes:
       - ./:/srv/datahub
@@ -23,6 +23,10 @@ services:
     environment:
       DATA_API_TOKEN: ${ENERGO__DATA_API__MANAGE_API_TOKEN:-secretmanagetoken}
       DATA_API_URL: "http://api:8000"
+      DOCKER_REGISTRY: ${ENERGO__DOCKER__REGISTRY:-dcreg.icool.cloud}
+      DOCKER_USERNAME: ${ENERGO__DOCKER__USERNAME:-energo}
+      DOCKER_PASSWORD: ${ENERGO__DOCKER__PASSWORD:-}
+      IGNORE_GIT_ERRORS: ${ENERGO__CONFIG__IGNORE_GIT_ERRORS:-false}
     networks:
       - energo
     healthcheck:
