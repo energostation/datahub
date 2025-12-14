@@ -1,0 +1,20 @@
+[Unit]
+Description=DataHub updater script
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/srv/datahub
+ExecStart=/srv/datahub/bin/updater.sh
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=datahub
+
+[Install]
+WantedBy=multi-user.target

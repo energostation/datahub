@@ -119,19 +119,20 @@ Other services
 - [https://adminer.docker.localhost](https://adminer.docker.localhost) - database management tool (only if debug profile is enabled)
 - [https://config.docker.localhost](https://config.docker.localhost) - configuration (`.env` and certificates) management tool
 
-### Systemd service
+### Systemd services
 
 Copy files from `./systemd/` to `/etc/systemd/system/` run `systemctl daemon-reload`. 
 
 Then enable and start services.
 ```shell
-systemctl enable --now datahub-core.service datahub-services.service
+systemctl enable datahub-core.service datahub-services.service datahub-udater.service
+systemctl start datahub-core.service datahub-services.service datahub-udater.service
 ```
 
 Check status
 
 ```shell
-systemctl status datahub-core.service datahub-services.service
+systemctl status datahub-core.service datahub-services.service datahub-udater.service
 ```
 
 ## MQTT
