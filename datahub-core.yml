@@ -17,6 +17,7 @@ services:
   config:
     image: test-dcreg.icool.cloud/data-config:latest
     container_name: energo-config
+    restart: unless-stopped
     volumes:
       - ./:/srv/datahub
       - /var/run/docker.sock:/var/run/docker.sock
@@ -51,7 +52,6 @@ services:
       # Middleware chain
       - "traefik.http.routers.config-http.middlewares=config-basicauth@docker"
       - "traefik.http.routers.config-https.middlewares=config-basicauth@docker"
-    restart: no
     profiles:
       - base
   traefik:

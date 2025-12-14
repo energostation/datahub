@@ -4,6 +4,7 @@ services:
   postgres:
     image: timescale/timescaledb:2.22.0-pg16
     container_name: energo-database
+    restart: unless-stopped
     environment:
       # let's keep postgres as admin user
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -44,6 +45,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    restart: unless-stopped
     environment:
       DOCKER_VERNEMQ_ACCEPT_EULA: yes
       DOCKER_VERNEMQ_ALLOW_ANONYMOUS: off
@@ -95,6 +97,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    restart: unless-stopped
     environment:
       ALLOWED_HOST: api.${DOMAIN_SUFFIX:-docker.localhost}
       SECRET_KEY: ${ENERGO__DATA_API__SECRET_KEY:-secret}
@@ -121,7 +124,6 @@ services:
       timeout: 3s
       retries: 10
       start_period: 10s
-    restart: unless-stopped
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.api.rule=Host(`api.${DOMAIN_SUFFIX:-docker.localhost}`)"
@@ -135,6 +137,7 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    restart: no
     command: collectstatic --noinput
     environment:
       SECRET_KEY: ${ENERGO__DATA_API__SECRET_KEY:-secret}
@@ -146,7 +149,6 @@ services:
       - static_files:/srv/static
     networks:
       - energo
-    restart: "no"
     profiles:
       - base
   subscriber:
@@ -157,6 +159,7 @@ services:
         condition: service_healthy
       mqtt:
         condition: service_started
+    restart: unless-stopped
     environment:
       MQTT_HOST: mqtt
       MQTT_USERNAME: ${ENERGO__MQTT__USERNAME:-subscriber}
@@ -170,7 +173,6 @@ services:
       EXTERNAL_CHECK_TOKEN: ${ENERGO_EXTERNAL_CHECK_TOKEN_DATA_SUBSCRIBER:-bflmpsvz}
     networks:
       - energo
-    restart: unless-stopped
     profiles:
       - base
   grafana:
@@ -179,6 +181,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    restart: unless-stopped
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
@@ -201,6 +204,7 @@ services:
   gatus:
     image: twinproduction/gatus:v5.24.0
     container_name: energo-status
+    restart: unless-stopped
     environment:
       GSTATUS_CONFIG_FILE: /config/config.yaml
       DOMAIN_SUFFIX: ${DOMAIN_SUFFIX:-docker.localhost}
@@ -227,6 +231,7 @@ services:
   static:
     image: nginx:1-alpine
     container_name: energo-static
+    restart: unless-stopped
     volumes:
       - static_files:/usr/share/nginx/html/static:ro
     networks:
@@ -276,7 +281,7 @@ services:
   adminer:
     image: adminer:standalone
     container_name: energo-adminer
-    restart: always
+    restart: unless-stopped
     networks:
       - energo
     labels:
