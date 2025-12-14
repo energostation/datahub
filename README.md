@@ -125,14 +125,14 @@ Copy files from `./systemd/` to `/etc/systemd/system/` run `systemctl daemon-rel
 
 Then enable and start services.
 ```shell
-systemctl enable datahub-core.service datahub-services.service datahub-udater.service
-systemctl start datahub-core.service datahub-services.service datahub-udater.service
+systemctl enable datahub-core.service datahub-services.service datahub-updater.service
+systemctl start datahub-core.service datahub-services.service datahub-updater.service
 ```
 
 Check status
 
 ```shell
-systemctl status datahub-core.service datahub-services.service datahub-udater.service
+systemctl status datahub-core.service datahub-services.service datahub-updater.service
 ```
 
 ## MQTT
