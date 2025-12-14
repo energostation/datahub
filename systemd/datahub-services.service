@@ -1,6 +1,6 @@
 [Unit]
 Description=DataHub services (docker compose)
-Requires=docker.service datahub-core.service
+Requires=docker.service
 After=docker.service datahub-core.service network-online.target
 Wants=network-online.target
 
