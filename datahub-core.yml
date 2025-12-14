@@ -33,12 +33,20 @@ services:
       start_period: 10s
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.config.rule=Host(`config.${DOMAIN_SUFFIX:-docker.localhost}`)"
-      - "traefik.http.routers.config.entrypoints=websecure"
-      - "traefik.http.routers.config.tls=true"
+      # HTTPS via DNS name
+      - "traefik.http.routers.config-https.rule=Host(`config.${DOMAIN_SUFFIX:-docker.localhost}`)"
+      - "traefik.http.routers.config-https.entrypoints=websecure"
+      - "traefik.http.routers.config-https.tls=true"
+      # HTTP fallback if the domain is not configured
+      - "traefik.http.routers.config-http.rule=HostRegexp(`{host:[0-9.]*}`) || Host(`localhost`)"
+      - "traefik.http.routers.config-http.entrypoints=web"
+      - "traefik.http.routers.config-http.tls=false"
+      # Basic Auth
       - "traefik.http.middlewares.config-basicauth.basicauth.users=${ENERGO__CONFIG__HTPASSWD:-energo:missingpasswd}"
       - "traefik.http.middlewares.config-basicauth.basicauth.realm=DataHub"
-      - "traefik.http.routers.config.middlewares=config-basicauth@docker"
+      # Middleware chain
+      - "traefik.http.routers.config-http.middlewares=config-basicauth@docker"
+      - "traefik.http.routers.config-https.middlewares=config-basicauth@docker"
     restart: no
     profiles:
       - base
@@ -49,9 +57,6 @@ services:
     command:
       # EntryPoints
       - "--entrypoints.web.address=:80"
-      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
-      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
-      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
       - "--entrypoints.websecure.address=:443"
       - "--entrypoints.websecure.http.tls=true"
       - "--entrypoints.mqtts.address=:8883"
@@ -73,6 +78,7 @@ services:
       - "--accesslog=true"
       - "--metrics.prometheus=true"
     ports:
+      - "${ENERGO__PROXY__PUBLIC_FALLBACK_PORT:-80}:80"
       - "${ENERGO__PROXY__PUBLIC_PORT:-443}:443"
       - "${ENERGO__PROXY__MQTT__PUBLIC_PORT:-8883}:8883"
     volumes:
