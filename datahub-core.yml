@@ -38,7 +38,7 @@ services:
       - "traefik.http.routers.config-https.entrypoints=websecure"
       - "traefik.http.routers.config-https.tls=true"
       # HTTP fallback if the domain is not configured
-      - "traefik.http.routers.config-http.rule=HostRegexp(`{host:[0-9.]*}`) || Host(`localhost`)"
+      - "traefik.http.routers.config-http.rule=HostRegexp(`^[0-9.]+`) || Host(`localhost`)"
       - "traefik.http.routers.config-http.entrypoints=web"
       - "traefik.http.routers.config-http.tls=false"
       # Basic Auth
