@@ -1,0 +1,16 @@
+[Unit]
+Description=DataHub core (docker compose)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/srv/datahub
+ExecStart=/usr/bin/docker compose -f /srv/datahub/datahub-core.yml --profile base up -d
+ExecStop=/usr/bin/docker compose -f /srv/datahub/datahub-core.yml --profile base down
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target

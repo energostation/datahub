@@ -119,6 +119,21 @@ Other services
 - [https://adminer.docker.localhost](https://adminer.docker.localhost) - database management tool (only if debug profile is enabled)
 - [https://config.docker.localhost](https://config.docker.localhost) - configuration (`.env` and certificates) management tool
 
+### Systemd service
+
+Copy files from `./systemd/` to `/etc/systemd/system/` run `systemctl daemon-reload`. 
+
+Then enable and start services.
+```shell
+systemctl enable --now datahub-core.service datahub-services.service
+```
+
+Check status
+
+```shell
+systemctl status datahub-core.service datahub-services.service
+```
+
 ## MQTT
 
 ### Setup client (PLC)
@@ -168,7 +183,7 @@ mosquitto_pub \
 
 ## Data API
 
-see: [API swagger](https://api.docker.localhost/api/schema/swagger-ui/) at `https://api.docker.localhost/api/schema/swagger-ui/`
+see: [API swagger](https://api.docker.localhost/api/schema/swagger-ui/) at `https://api.docker.localhost/api/schema/swagger-ui`
 
 
 # TODO
