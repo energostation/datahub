@@ -44,16 +44,6 @@ EOSQL
 echo "Creating ACL table for MQTT broker"
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" -d "$ENERGO_POSTGRES__MQTT__DATABASE" <<-EOSQL
     CREATE EXTENSION pgcrypto;
-    CREATE TABLE vmq_auth_acl
-    (
-        mountpoint character varying(10) NOT NULL,
-        client_id character varying(128) NOT NULL,
-        username character varying(128) NOT NULL,
-        password character varying(128),
-        publish_acl json,
-        subscribe_acl json,
-        CONSTRAINT vmq_auth_acl_primary_key PRIMARY KEY (mountpoint, client_id, username)
-    );
 EOSQL
 
 echo "Creating grant function for energo datalog tables"
