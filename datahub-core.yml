@@ -38,6 +38,7 @@ services:
       start_period: 10s
     labels:
       - "traefik.enable=true"
+      - "traefik.instance=datahub"
       # HTTPS via DNS name
       - "traefik.http.routers.config-https.rule=Host(`config.${DOMAIN_SUFFIX:-docker.localhost}`)"
       - "traefik.http.routers.config-https.entrypoints=websecure"
@@ -72,6 +73,7 @@ services:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.network=energo"
+      - "--providers.docker.constraints=Label(`traefik.instance`,`datahub`)"
 
       # API & Dashboard
       - "--api.dashboard=true"
@@ -93,6 +95,7 @@ services:
       - energo
     labels:
       - "traefik.enable=true"
+      - "traefik.instance=datahub"
       - "traefik.http.routers.dashboard.rule=Host(`proxy.${DOMAIN_SUFFIX:-docker.localhost}`)"
       - "traefik.http.routers.dashboard.entrypoints=websecure"
       - "traefik.http.routers.dashboard.service=api@internal"

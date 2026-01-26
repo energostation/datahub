@@ -78,6 +78,7 @@ services:
       - energo
     labels:
       - "traefik.enable=true"
+      - "traefik.instance=datahub"
       - "traefik.http.routers.mqtt.rule=Host(`mqtt.${DOMAIN_SUFFIX:-docker.localhost}`)"
       - "traefik.http.routers.mqtt.entrypoints=websecure"
       - "traefik.http.routers.mqtt.tls=true"
@@ -126,6 +127,7 @@ services:
       start_period: 10s
     labels:
       - "traefik.enable=true"
+      - "traefik.instance=datahub"
       - "traefik.http.routers.api.rule=Host(`api.${DOMAIN_SUFFIX:-docker.localhost}`)"
       - "traefik.http.routers.api.entrypoints=websecure"
       - "traefik.http.routers.api.tls=true"
@@ -196,6 +198,7 @@ services:
       - energo
     labels:
       - "traefik.enable=true"
+      - "traefik.instance=datahub"
       - "traefik.http.routers.grafana.rule=Host(`grafana.${DOMAIN_SUFFIX:-docker.localhost}`)"
       - "traefik.http.routers.grafana.entrypoints=websecure"
       - "traefik.http.routers.grafana.tls=true"
@@ -223,6 +226,7 @@ services:
       - energo
     labels:
       - "traefik.enable=true"
+      - "traefik.instance=datahub"
       - "traefik.http.routers.gatus.rule=Host(`status.${DOMAIN_SUFFIX:-docker.localhost}`)"
       - "traefik.http.routers.gatus.entrypoints=websecure"
       - "traefik.http.routers.gatus.tls=true"
@@ -238,6 +242,7 @@ services:
       - energo
     labels:
       - "traefik.enable=true"
+      - "traefik.instance=datahub"
       - "traefik.http.routers.static.rule=Host(`api.${DOMAIN_SUFFIX:-docker.localhost}`) && PathPrefix(`/static`)"
       - "traefik.http.routers.static.entrypoints=websecure"
       - "traefik.http.routers.static.tls=true"
@@ -286,6 +291,7 @@ services:
       - energo
     labels:
       - "traefik.enable=true"
+      - "traefik.instance=datahub"
       - "traefik.http.routers.adminer.rule=Host(`adminer.${DOMAIN_SUFFIX:-docker.localhost}`)"
       - "traefik.http.routers.adminer.entrypoints=websecure"
       - "traefik.http.routers.adminer.tls=true"
