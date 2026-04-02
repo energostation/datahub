@@ -93,7 +93,7 @@ services:
     profiles:
       - base
   api:
-    image: test-dcreg.icool.cloud/data-api:v1505
+    image: test-dcreg.icool.cloud/data-api:v1701
     container_name: energo-api
     depends_on:
       postgres:
@@ -121,7 +121,7 @@ services:
     networks:
       - energo
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/api/v1/healthcheck || exit 1"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/api/v1/data/healthcheck || exit 1"]
       interval: 10s
       timeout: 3s
       retries: 10
@@ -155,8 +155,12 @@ services:
     profiles:
       - base
   subscriber:
-    image: test-dcreg.icool.cloud/data-subscriber:v1502
+    image: hello-world:latest
     container_name: energo-subscriber
+    restart: no
+  datalogger:
+    image: test-dcreg.icool.cloud/data-logger:v1696
+    container_name: energo-datalogger
     depends_on:
       postgres:
         condition: service_healthy
@@ -172,8 +176,54 @@ services:
       DATABASE_NAME: ${ENERGO_POSTGRES__DATA_LOGGER__DATABASE:-logger}
       DATABASE_USER: ${ENERGO_POSTGRES__DATA_LOGGER__USERNAME:-logger}
       DATABASE_PASS: ${ENERGO_POSTGRES__DATA_LOGGER__PASSWORD:-logger}
-      EXTERNAL_CHECK_URL: "http://gatus:8080/api/v1/endpoints/services_data-subscriber/external"
-      EXTERNAL_CHECK_TOKEN: ${ENERGO_EXTERNAL_CHECK_TOKEN_DATA_SUBSCRIBER:-bflmpsvz}
+      EXTERNAL_CHECK_URL: "http://gatus:8080/api/v1/endpoints/services_data-logger/external"
+      EXTERNAL_CHECK_TOKEN: ${ENERGO_EXTERNAL_CHECK_TOKEN_DATA_LOGGER:-bflmpsvz}
+    networks:
+      - energo
+    profiles:
+      - base
+  auditor:
+    image: test-dcreg.icool.cloud/data-auditor:v1669
+    container_name: energo-auditor
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mqtt:
+        condition: service_started
+    restart: unless-stopped
+    environment:
+      MQTT_HOST: mqtt
+      MQTT_USERNAME: ${ENERGO__MQTT__USERNAME:-subscriber}
+      MQTT_PASSWORD: ${ENERGO__MQTT__PASSWORD:-password}
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      EXTERNAL_CHECK_URL: "http://gatus:8080/api/v1/endpoints/services_data-auditor/external"
+      EXTERNAL_CHECK_TOKEN: ${ENERGO_EXTERNAL_CHECK_TOKEN_DATA_AUDITOR:-bflmpsvz}
+      MANAGE_API_TOKEN: ${ENERGO__DATA_API__MANAGE_API_TOKEN:-secretmanagetoken}
+      MANAGE_API_URL: "http://api:8000"
+    networks:
+      - energo
+    profiles:
+      - base
+  notifier:
+    image: test-dcreg.icool.cloud/data-notifier:v1700
+    container_name: energo-notifier
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mqtt:
+        condition: service_started
+    restart: unless-stopped
+    environment:
+      MQTT_HOST: mqtt
+      MQTT_USERNAME: ${ENERGO__MQTT__USERNAME:-subscriber}
+      MQTT_PASSWORD: ${ENERGO__MQTT__PASSWORD:-password}
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      EXTERNAL_CHECK_URL: "http://gatus:8080/api/v1/endpoints/services_data-notifier/external"
+      EXTERNAL_CHECK_TOKEN: ${ENERGO_EXTERNAL_CHECK_TOKEN_DATA_NOTIFIER:-bflmpsvz}
+      MANAGE_API_TOKEN: ${ENERGO__DATA_API__MANAGE_API_TOKEN:-secretmanagetoken}
+      MANAGE_API_URL: "http://api:8000"
     networks:
       - energo
     profiles:
@@ -218,7 +268,9 @@ services:
       STATIC_HOST: static
       GRAFANA_HOST: grafana
       CONFIG_HOST: config
-      EXTERNAL_CHECK_TOKEN_DATA_SUBSCRIBER: ${ENERGO_EXTERNAL_CHECK_TOKEN_DATA_SUBSCRIBER:-bflmpsvz}
+      EXTERNAL_CHECK_TOKEN_DATA_LOGGER: ${ENERGO_EXTERNAL_CHECK_TOKEN_DATA_LOGGER:-bflmpsvz}
+      EXTERNAL_CHECK_TOKEN_DATA_NOTIFIER: ${ENERGO_EXTERNAL_CHECK_TOKEN_DATA_NOTIFIER:-bflmpsvz}
+      EXTERNAL_CHECK_TOKEN_DATA_AUDITOR: ${ENERGO_EXTERNAL_CHECK_TOKEN_DATA_AUDITOR:-bflmpsvz}
       GATUS_DELAY_START_SECONDS: 60
     volumes:
       - ./gatus/config.yaml:/config/config.yaml

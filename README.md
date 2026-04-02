@@ -47,14 +47,14 @@ Note that it is the suffix part, whole DNS name will look like `api.docker.local
 
 ```shell
 export DOMAIN_SUFFIX=docker.localhost
-docker-compose -f datahub-core.yml --profile=config up
+docker compose -f datahub-core.yml --profile=config up
 ```
 
 #### Running services
 
 ```shell
-docker-compose -f datahub-core.yml --profile=base up -d
-docker-compose -f datahub-services.yml --profile=base up -d
+docker compose -f datahub-core.yml --profile=base up -d
+docker compose -f datahub-services.yml --profile=base up -d
 ```
 
 this will start core services:
@@ -67,7 +67,7 @@ this will start core services:
 
 For monitoring services run
 ```shell
-docker-compose -f datahub-services.yml --profile=base --profile=monitoring up
+docker compose -f datahub-services.yml --profile=base --profile=monitoring up -d
 ```
 
 this will also start:
@@ -77,7 +77,7 @@ this will also start:
 
 For debug tools run
 ```shell
-docker-compose -f datahub-services.yml --profile=base --profile=monitoring  --profile=debug up
+docker compose -f datahub-services.yml --profile=base --profile=monitoring  --profile=debug up
 ```
 
 this will also start:
@@ -93,6 +93,22 @@ this will also start:
 - Gatus monitors health of all services
 - Prometheus scrapes metrics from proxy and database
 - Adminer provides database lookup and management
+
+#### Dependency graph
+
+```plain
+postgres
+├─ api
+│  └─ collectstatic
+├─ mqtt
+│  └─ subscriber
+├─ grafana
+└─ exporter-postgres
+
+api
+└─ mqtt
+   └─ subscriber
+```
 
 ### Usage
 Acessing services is possible via `docker.localhost` domain.
