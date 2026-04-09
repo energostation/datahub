@@ -93,7 +93,7 @@ services:
     profiles:
       - base
   api:
-    image: test-dcreg.icool.cloud/data-api:v1721
+    image: test-dcreg.icool.cloud/data-api:v1722
     container_name: energo-api
     depends_on:
       postgres:
