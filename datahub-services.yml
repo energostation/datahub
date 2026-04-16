@@ -215,7 +215,7 @@ services:
     profiles:
       - base
   notifier:
-    image: test-dcreg.icool.cloud/data-notifier:v1718
+    image: test-dcreg.icool.cloud/data-notifier:v1755
     container_name: energo-notifier
     depends_on:
       postgres:
