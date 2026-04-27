@@ -143,6 +143,26 @@ services:
       - "traefik.http.routers.api.middlewares=api-cors@docker"
     profiles:
       - base
+  app:
+    image: test-dcreg.icool.cloud/data-app:v1787
+    container_name: energo-app
+    restart: unless-stopped
+    networks:
+      - energo
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:80/ || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.instance=datahub"
+      - "traefik.http.routers.app.rule=Host(`app.${DOMAIN_SUFFIX:-docker.localhost}`)"
+      - "traefik.http.routers.app.entrypoints=websecure"
+      - "traefik.http.routers.app.tls=true"
+    profiles:
+      - base
   collectstatic:
     image: test-dcreg.icool.cloud/data-api:latest
     container_name: energo-collectstatic
