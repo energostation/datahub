@@ -1,0 +1,6 @@
+name: hubconfig
+
+services:
+  config:
+    ports:
+      - "5000:5000"

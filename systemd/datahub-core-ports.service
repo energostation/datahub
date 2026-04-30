@@ -1,0 +1,17 @@
+[Unit]
+Description=DataHub core (docker compose)
+Requires=docker.service
+After=docker.service network-online.target systemd-resolved.service
+Wants=network-online.target systemd-resolved.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/srv/datahub
+ExecStartPre=/usr/bin/bash -lc 'for i in {1..30}; do getent hosts nic.cz >/dev/null 2>&1 && exit 0; sleep 1; done; exit 0'
+ExecStart=/usr/bin/docker compose -f /srv/datahub/datahub-core.yml -f /srv/datahub/datahub-core.ports.yml --profile base up -d
+ExecStop=/usr/bin/docker compose -f /srv/datahub/datahub-core.yml -f /srv/datahub/datahub-core.ports.yml --profile base down
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target

@@ -28,6 +28,7 @@ services:
       DOCKER_USERNAME: ${ENERGO__DOCKER__USERNAME:-energo}
       DOCKER_PASSWORD: ${ENERGO__DOCKER__PASSWORD:-}
       IGNORE_GIT_ERRORS: ${ENERGO__CONFIG__IGNORE_GIT_ERRORS:-false}
+      COMPOSE_EXPOSE_PORTS: ${ENERGO__COMPOSE_EXPOSE_PORTS:-false}
     networks:
       - energo
     healthcheck:

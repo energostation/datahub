@@ -59,6 +59,7 @@ docker compose -f datahub-services.yml --profile=base up -d
 
 this will start core services:
 - API
+- App
 - Database
 - Grafana
 - HTTP proxy
@@ -85,7 +86,7 @@ this will also start:
 
 #### Key Connections:
 
-- HTTP proxy routes external traffic to: API, Grafana, MQTT, Gatus, Adminer
+- HTTP proxy routes external traffic to: API, App, Grafana, MQTT, Gatus, Adminer
 - MQTT broker uses a database for authentication and authorization
 - Subscriber connects to MQTT broker via MQTTS and writes to a database
 - Data API reads/writes a database and manages MQTT users
@@ -111,29 +112,44 @@ api
 ```
 
 ### Usage
-Acessing services is possible via `docker.localhost` domain.
 
-MQTT broker is exposed on port `8883` with TLS through the TCP proxy, so correct SNI must be used.
+#### Via domain name (default)
+
+Services are exposed on port `443` with TLS through the HTTP proxy.
+
+- [https://api.docker.localhost](https://api.docker.localhost) - Data REST API
+- [https://app.docker.localhost](https://app.docker.localhost) - Web application for communicating with PLCs
+- [https://grafana.docker.localhost](https://grafana.docker.localhost) - Data visualization tool
+- [https://status.docker.localhost](https://status.docker.localhost) - monitoring tool (only if monitoring profile is enabled)
+- [https://mqtt.docker.localhost/status](https://mqtt.docker.localhost/status) - MQTT broker web status
+- [https://proxy.docker.localhost](https://proxy.docker.localhost) - HTTP proxy dashboard
+- [https://adminer.docker.localhost](https://adminer.docker.localhost) - database management tool (only if debug profile is enabled)
+- [https://config.docker.localhost](https://config.docker.localhost) - configuration (`.env` and certificates) management tool
+
+MQTT broker is exposed on port `8883` with TLS through the TCP proxy, SNI routing requires the correct hostname.
 
 - `mqtt.docker.localhost:8883`
 
-However, it can be accessed directly on port `1883` via IP address. 
+#### Via IP address and port (direct access)
+
+Port bindings can be enabled using the provided override files:
+
 ```shell
-docker inspect energo-mqtt | jq -r '.[].NetworkSettings.Networks.energo.IPAddress'
+docker compose -f datahub-core.yml -f datahub-core.ports.yml --profile=base up -d
+docker compose -f datahub-services.yml -f datahub-services.ports.yml --profile=base up -d
 ```
 
-Other services are exposed on port `443` with TLS through the HTTP proxy.
-
-- [https://api.docker.localhost](https://api.docker.localhost) - Data REST API
-- [https://grafana.docker.localhost](https://grafana.docker.localhost) - Data visualization tool
-
-Other services
-
-- [https://status.docker.localhost](https://status.docker.localhost) - monitoring tool (only if monitoring profile is enabled)
-- [https://mqtt.docker.localhost/status](https://mqtt.docker.localhost/status) - MQTT broker web status
-- [https://proxy.docker.localhost](https://proxy.docker.localhost) - HTTP proxy proxy
-- [https://adminer.docker.localhost](https://adminer.docker.localhost) - database management tool (only if debug profile is enabled)
-- [https://config.docker.localhost](https://config.docker.localhost) - configuration (`.env` and certificates) management tool
+| Service | Host port | Description |
+|---------|-----------|-------------|
+| postgres | 5432 | TimescaleDB |
+| mqtt | 1883 | MQTT broker (plain TCP, no TLS) |
+| api | 8000 | Data REST API |
+| app | 8001 | Web application |
+| grafana | 3000 | Data visualization |
+| gatus | 8082 | Monitoring (monitoring profile) |
+| prometheus | 9090 | Metrics (monitoring profile) |
+| adminer | 8081 | Database management (debug profile) |
+| config | 5000 | Configuration management |
 
 ### Systemd services
 
