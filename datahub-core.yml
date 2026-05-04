@@ -2,7 +2,7 @@ name: hubconfig
 
 services:
   config-make:
-    image: test-dcreg.icool.cloud/data-config:v1794
+    image: test-dcreg.icool.cloud/data-config:v1795
     container_name: energo-config-make
     environment:
       DOMAIN_SUFFIX: ${DOMAIN_SUFFIX:-docker.localhost}
@@ -15,7 +15,7 @@ services:
     profiles:
       - config
   config:
-    image: test-dcreg.icool.cloud/data-config:v1794
+    image: test-dcreg.icool.cloud/data-config:v1795
     container_name: energo-config
     restart: unless-stopped
     volumes:
