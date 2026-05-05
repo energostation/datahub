@@ -148,7 +148,7 @@ docker compose -f datahub-services.yml -f datahub-services.ports.yml --profile=b
 | api | 8000 | Data REST API |
 | app | 8001 | Web application |
 | grafana | 3000 | Data visualization |
-| gatus | 8082 | Monitoring (monitoring profile) |
+| status | 8082 | Monitoring (monitoring profile) |
 | adminer | 8091 | Database management (debug profile) |
 | config | 5000 | Configuration management |
 
