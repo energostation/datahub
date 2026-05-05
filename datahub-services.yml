@@ -90,6 +90,10 @@ services:
       - "traefik.tcp.routers.mqtts.entrypoints=mqtts"
       - "traefik.tcp.routers.mqtts.tls=true"
       - "traefik.tcp.services.mqtts.loadbalancer.server.port=1883"
+      - "traefik.tcp.routers.mqtts-fallback.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.mqtts-fallback.entrypoints=mqtts"
+      - "traefik.tcp.routers.mqtts-fallback.tls=true"
+      - "traefik.tcp.routers.mqtts-fallback.service=mqtts"
     profiles:
       - base
   api:

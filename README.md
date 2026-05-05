@@ -61,10 +61,12 @@ this will start core services:
 - API
 - App
 - Database
+- Datalogger
+- Auditor
+- Notifier
 - Grafana
 - HTTP proxy
-- MQTT broker 
-- Subscriber
+- MQTT broker
 
 For monitoring services run
 ```shell
@@ -88,7 +90,9 @@ this will also start:
 
 - HTTP proxy routes external traffic to: API, App, Grafana, MQTT, Gatus, Adminer
 - MQTT broker uses a database for authentication and authorization
-- Subscriber connects to MQTT broker via MQTTS and writes to a database
+- Datalogger connects to MQTT broker and writes to a database
+- Auditor connects to MQTT broker and validates incoming data
+- Notifier connects to MQTT broker and sends alerts
 - Data API reads/writes a database and manages MQTT users
 - Grafana visualizes data from database
 - Gatus monitors health of all services
@@ -102,13 +106,13 @@ postgres
 ├─ api
 │  └─ collectstatic
 ├─ mqtt
-│  └─ subscriber
+│  ├─ datalogger
+│  ├─ auditor
+│  └─ notifier
 ├─ grafana
 └─ exporter-postgres
 
-api
-└─ mqtt
-   └─ subscriber
+app (no dependencies)
 ```
 
 ### Usage
@@ -141,14 +145,11 @@ docker compose -f datahub-services.yml -f datahub-services.ports.yml --profile=b
 
 | Service | Host port | Description |
 |---------|-----------|-------------|
-| postgres | 5432 | TimescaleDB |
-| mqtt | 1883 | MQTT broker (plain TCP, no TLS) |
 | api | 8000 | Data REST API |
 | app | 8001 | Web application |
 | grafana | 3000 | Data visualization |
 | gatus | 8082 | Monitoring (monitoring profile) |
-| prometheus | 9090 | Metrics (monitoring profile) |
-| adminer | 8081 | Database management (debug profile) |
+| adminer | 8091 | Database management (debug profile) |
 | config | 5000 | Configuration management |
 
 ### Systemd services
