@@ -1,225 +1,84 @@
 # Energostation DataHub
 
-## Setup
+An MQTT-based industrial IoT data collection platform.
+PLCs publish telemetry to a VerneMQ MQTT broker; data flows through subscriber services into TimescaleDB; Grafana visualizes it.
+Everything runs as Docker Compose services managed by systemd.
 
-### ENV
+## Documentation
 
-However `docker compose` can be run immediately, `.env` file is used for configuration, and it is almost inevitable to use it.
+- [Setup](docs/setup.md) — prerequisites, SSL certificates, environment variables, initial config generation
+- [Running services](docs/running.md) — compose profiles, service endpoints, direct port access
+- [Systemd](docs/systemd.md) — installing and managing systemd units, hot-reload mechanism
+- [MQTT](docs/mqtt.md) — topic/payload format, PLC client setup, publishing data
 
-### SSL
+## Architecture
 
-Certificates have to be provided for the following services:
+### Data flow
 
-- MQTT broker, server certificate
-- HTTP proxy, server *wildcard* certificate
+```
+PLC → MQTTS :8883 (Traefik TCP/SNI) → VerneMQ
+                                        ├─ datalogger → TimescaleDB (logger DB)
+                                        ├─ auditor    → auditing messages processing
+                                        └─ notifier   → sends alerts
 
-Client certificate for PLC is generated elsewhere and is already deployed.
-
-The server certificates must be placed in the `ssl` directory.
-
-```plain
-ssl
-├── mqtt
-│   ├── server.crt
-│   └── server.key
-└── proxy
-    ├── server.crt
-    └── server.key
+HTTPS :443 (Traefik) → api (Django REST)
+                     → app (web UI)
+                     → grafana
+                     → status (Gatus)
+                     → config UI
 ```
 
-#### Trusted CA
+### Services
 
-The MQTT broker and HTTP proxy use custom CA.
+| Service | Image | Description |
+|---|---|---|
+| traefik | `traefik:v3.6` | Reverse proxy and TCP router |
+| postgres | `timescale/timescaledb:2.22.0-pg16` | TimescaleDB (primary datastore) |
+| mqtt | `vernemq/vernemq:2.1.1` | MQTT broker with PostgreSQL auth |
+| api | `data-api` | Django REST API, manages MQTT users and PLC config |
+| app | `data-app` | Web application for PLC communication |
+| datalogger | `data-logger` | Subscribes to MQTT, writes to TimescaleDB |
+| auditor | `data-auditor` | Subscribes to MQTT, validates incoming data |
+| notifier | `data-notifier` | Subscribes to MQTT, sends alerts |
+| grafana | `grafana/grafana` | Data visualization |
+| config | `data-config` | Config UI for `.env` and certificate management |
+| gatus | `twinproduction/gatus` | Health monitoring (monitoring profile) |
+| prometheus | `prom/prometheus` | Metrics collection (monitoring profile) |
+| exporter-postgres | `postgres-exporter` | PostgreSQL metrics for Prometheus (monitoring profile) |
+| adminer | `adminer` | Database management UI (debug profile) |
 
-### Docker
+## Accessing services
 
-#### Initial setup run
+### Via domain name (default)
 
-```shell
-docker network create energo
-```
-to create an external network for services.
+Services are exposed on port `443` with TLS through Traefik. Replace `docker.localhost` with your `DOMAIN_SUFFIX`.
 
-Then create `.env` file and generate certificates.
+| URL | Service |
+|---|---|
+| `https://api.docker.localhost` | Data REST API |
+| `https://app.docker.localhost` | Web application |
+| `https://grafana.docker.localhost` | Grafana dashboards |
+| `https://status.docker.localhost` | Health monitoring (monitoring profile) |
+| `https://mqtt.docker.localhost` | MQTT broker status (basic auth) |
+| `https://proxy.docker.localhost` | Traefik dashboard (basic auth) |
+| `https://config.docker.localhost` | Config UI (basic auth) |
+| `https://adminer.docker.localhost` | Database management (debug profile) |
 
-Use ENV `DOMAIN_SUFFIX=docker.localhost` for custom domain suffix.
-Note that it is the suffix part, whole DNS name will look like `api.docker.localhost`.
+MQTT broker: `mqtt.docker.localhost:8883` (TLS, TCP/SNI routing).
 
-```shell
-export DOMAIN_SUFFIX=docker.localhost
-docker compose -f datahub-core.yml --profile=config up
-```
+### Via static IP and port
 
-#### Running services
+Enable port bindings using the `*.ports.yml` override files (see [Running services](docs/running.md#direct-access-via-host-ports)):
 
-```shell
-docker compose -f datahub-core.yml --profile=base up -d
-docker compose -f datahub-services.yml --profile=base up -d
-```
+| Service | Host port |
+|---|---|
+| api | 8000 |
+| app | 8001 |
+| grafana | 3000 |
+| status | 8082 |
+| adminer | 8091 |
+| config | 5000 |
 
-this will start core services:
-- API
-- App
-- Database
-- Datalogger
-- Auditor
-- Notifier
-- Grafana
-- HTTP proxy
-- MQTT broker
+## TODO
 
-For monitoring services run
-```shell
-docker compose -f datahub-services.yml --profile=base --profile=monitoring up -d
-```
-
-this will also start:
-- Gatus
-- Prometheus
-- Postgres exporter
-
-For debug tools run
-```shell
-docker compose -f datahub-services.yml --profile=base --profile=monitoring  --profile=debug up
-```
-
-this will also start:
-- Adminer
-
-#### Key Connections:
-
-- HTTP proxy routes external traffic to: API, App, Grafana, MQTT, Gatus, Adminer
-- MQTT broker uses a database for authentication and authorization
-- Datalogger connects to MQTT broker and writes to a database
-- Auditor connects to MQTT broker and validates incoming data
-- Notifier connects to MQTT broker and sends alerts
-- Data API reads/writes a database and manages MQTT users
-- Grafana visualizes data from database
-- Gatus monitors health of all services
-- Prometheus scrapes metrics from proxy and database
-- Adminer provides database lookup and management
-
-#### Dependency graph
-
-```plain
-postgres
-├─ api
-│  └─ collectstatic
-├─ mqtt
-│  ├─ datalogger
-│  ├─ auditor
-│  └─ notifier
-├─ grafana
-└─ exporter-postgres
-
-app (no dependencies)
-```
-
-### Usage
-
-#### Via domain name (default)
-
-Services are exposed on port `443` with TLS through the HTTP proxy.
-
-- [https://api.docker.localhost](https://api.docker.localhost) - Data REST API
-- [https://app.docker.localhost](https://app.docker.localhost) - Web application for communicating with PLCs
-- [https://grafana.docker.localhost](https://grafana.docker.localhost) - Data visualization tool
-- [https://status.docker.localhost](https://status.docker.localhost) - monitoring tool (only if monitoring profile is enabled)
-- [https://mqtt.docker.localhost/status](https://mqtt.docker.localhost/status) - MQTT broker web status
-- [https://proxy.docker.localhost](https://proxy.docker.localhost) - HTTP proxy dashboard
-- [https://adminer.docker.localhost](https://adminer.docker.localhost) - database management tool (only if debug profile is enabled)
-- [https://config.docker.localhost](https://config.docker.localhost) - configuration (`.env` and certificates) management tool
-
-MQTT broker is exposed on port `8883` with TLS through the TCP proxy, SNI routing requires the correct hostname.
-
-- `mqtt.docker.localhost:8883`
-
-#### Via IP address and port (direct access)
-
-Port bindings can be enabled using the provided override files:
-
-```shell
-docker compose -f datahub-core.yml -f datahub-core.ports.yml --profile=base up -d
-docker compose -f datahub-services.yml -f datahub-services.ports.yml --profile=base up -d
-```
-
-| Service | Host port | Description |
-|---------|-----------|-------------|
-| api | 8000 | Data REST API |
-| app | 8001 | Web application |
-| grafana | 3000 | Data visualization |
-| status | 8082 | Monitoring (monitoring profile) |
-| adminer | 8091 | Database management (debug profile) |
-| config | 5000 | Configuration management |
-
-### Systemd services
-
-Copy files from `./systemd/` to `/etc/systemd/system/` run `systemctl daemon-reload`. 
-
-Then enable and start services.
-```shell
-systemctl enable datahub-core.service datahub-services.service datahub-updater.service
-systemctl start datahub-core.service datahub-services.service datahub-updater.service
-```
-
-Check status
-
-```shell
-systemctl status datahub-core.service datahub-services.service datahub-updater.service
-```
-
-## MQTT
-
-### Setup client (PLC)
-
-PLC configuration is deployed elsewhere via configurator, using the "Deploy embedded API" button.
-
-However, for PLC to be able to connect to the broker, configuration must be deployed to DataHub.
-
-From the configurator get the necessary (encrypted) configuration bundle and send it to the DataHub `config.docker.localhost` GUI interface.
-
-```shell
-curl \
-  -X POST \
-  -H "Authorization: Token $ENERGO__DATA_API__MANAGE_API_TOKEN" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "password=$PASSWORD_BUNDLE" \
-  -d "content=$ENCRYPTED_CONFIG_BUNDLE" \
-  "https://api.docker.localhost/manage/config/"
-```
-
-### Publish data
-
-```shell
-mosquitto_pub \
-  -h <IP_ADDRESS_OF_MQTT_BROKER> \
-  -p 1883 \
-  -i $CLIENT_ID \
-  -u $MQTT_USERNAME \
-  -P $MQTT_PASSWORD \
-  -t plc/v1/${PROJECT_ID}/${PLC_ID}/message \
-  -m '{"timestamp": "2025-10-17 10:22:19.030705", "argument": "FB_TEST.TEST_ARG", "value": 3.14}'
-```
-
-```shell
-mosquitto_pub \
-  -h mqtt.docker.localhost \
-  -p 8883 \
-  --cafile $MQTT_CA \
-  --cert $MQTT_CERT \
-  --key $MQTT_KEY \
-  -i $CLIENT_ID \
-  -u $MQTT_USERNAME \
-  -P $MQTT_PASSWORD \
-  -t plc/v1/${PROJECT_ID}/${PLC_ID}/message \
-  -m '{"timestamp": "2025-10-17 10:22:19.030705", "argument": "FB_TEST.TEST_ARG", "value": 3.14}'
-```
-
-## Data API
-
-see: [API swagger](https://api.docker.localhost/api/schema/swagger-ui/) at `https://api.docker.localhost/api/schema/swagger-ui`
-
-
-# TODO
-- backups
-- updates
+- Backups
