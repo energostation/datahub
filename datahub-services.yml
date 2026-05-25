@@ -97,7 +97,7 @@ services:
     profiles:
       - base
   api:
-    image: test-dcreg.icool.cloud/data-api:v1728
+    image: test-dcreg.icool.cloud/data-api:v1857
     container_name: energo-api
     depends_on:
       postgres:
@@ -168,7 +168,7 @@ services:
     profiles:
       - base
   collectstatic:
-    image: test-dcreg.icool.cloud/data-api:latest
+    image: test-dcreg.icool.cloud/data-api:v1857
     container_name: energo-collectstatic
     depends_on:
       api:
@@ -177,20 +177,24 @@ services:
     command: collectstatic --noinput
     environment:
       SECRET_KEY: ${ENERGO__DATA_API__SECRET_KEY:-secret}
+      API_DATABASE_HOST: postgres
       API_DATABASE_NAME: ${ENERGO_POSTGRES__DATA_API__DATABASE:-api}
       API_DATABASE_USER: ${ENERGO_POSTGRES__DATA_API__USERNAME:-api}
       API_DATABASE_PASS: ${ENERGO_POSTGRES__DATA_API__PASSWORD:-api}
-      API_DATABASE_HOST: postgres
+      LOGGER_DATABASE_HOST: postgres
+      LOGGER_DATABASE_NAME: ${ENERGO_POSTGRES__DATA_LOGGER__DATABASE:-logger}
+      LOGGER_DATABASE_USER: ${ENERGO_POSTGRES__DATA_LOGGER__USERNAME:-logger}
+      LOGGER_DATABASE_PASS: ${ENERGO_POSTGRES__DATA_LOGGER__PASSWORD:-logger}
+      MQTT_DATABASE_HOST: postgres
+      MQTT_DATABASE_NAME: ${ENERGO_POSTGRES__MQTT__DATABASE:-mqtt}
+      MQTT_DATABASE_USER: ${ENERGO_POSTGRES__MQTT__USERNAME:-mqtt}
+      MQTT_DATABASE_PASS: ${ENERGO_POSTGRES__MQTT__PASSWORD:-mqtt}
     volumes:
       - static_files:/srv/static
     networks:
       - energo
     profiles:
       - base
-  subscriber:
-    image: hello-world:latest
-    container_name: energo-subscriber
-    restart: no
   datalogger:
     image: test-dcreg.icool.cloud/data-logger:v1696
     container_name: energo-datalogger
@@ -239,7 +243,7 @@ services:
     profiles:
       - base
   notifier:
-    image: test-dcreg.icool.cloud/data-notifier:v1755
+    image: test-dcreg.icool.cloud/data-notifier:v1858
     container_name: energo-notifier
     depends_on:
       postgres:
