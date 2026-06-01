@@ -10,6 +10,8 @@ Everything runs as Docker Compose services managed by systemd.
 - [Running services](docs/running.md) — compose profiles, service endpoints, direct port access
 - [Systemd](docs/systemd.md) — installing and managing systemd units, hot-reload mechanism
 - [MQTT](docs/mqtt.md) — topic/payload format, PLC client setup, publishing data
+- [Hardware](docs/hardware.md) — resource drivers, sizing tiers, storage and network requirements
+- [DataHub VM](docs/datahub-vm.md) — pre-installed Debian VM image, networking, exposed ports, certificates
 
 ## Architecture
 
