@@ -353,6 +353,23 @@ services:
       - energo
     profiles:
       - monitoring
+  cadvisor:
+    image: ghcr.io/google/cadvisor:v0.57.0
+    container_name: energo-cadvisor
+    restart: unless-stopped
+    privileged: true
+    devices:
+      - /dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks:
+      - energo
+    profiles:
+      - monitoring
   prometheus:
     image: prom/prometheus:v3.7.1
     container_name: energo-prometheus
@@ -368,9 +385,11 @@ services:
 #        exec /bin/prometheus
 #      '
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--config.file=/etc/prometheus/prometheus.yaml'
       - '--storage.tsdb.path=/prometheus'
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+    networks:
+      - energo
     profiles:
       - monitoring
   adminer:
