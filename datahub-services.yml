@@ -37,6 +37,8 @@ services:
       - ./db/init/energo-setup.sh:/docker-entrypoint-initdb.d/999_energo-setup.sh:ro
     networks:
       - energo
+    labels:
+      - "energo.logs=true"
     profiles:
       - base
   mqtt:
@@ -94,6 +96,7 @@ services:
       - "traefik.tcp.routers.mqtts-fallback.entrypoints=mqtts"
       - "traefik.tcp.routers.mqtts-fallback.tls=true"
       - "traefik.tcp.routers.mqtts-fallback.service=mqtts"
+      - "energo.logs=true"
     profiles:
       - base
   api:
@@ -145,6 +148,7 @@ services:
       - "traefik.http.middlewares.api-cors.headers.accessControlMaxAge=86400"
       - "traefik.http.middlewares.api-cors.headers.addVaryHeader=true"
       - "traefik.http.routers.api.middlewares=api-cors@docker"
+      - "energo.logs=true"
     profiles:
       - base
   app:
@@ -193,6 +197,8 @@ services:
       - static_files:/srv/static
     networks:
       - energo
+    labels:
+      - "energo.logs=true"
     profiles:
       - base
   datalogger:
@@ -217,6 +223,8 @@ services:
       EXTERNAL_CHECK_TOKEN: ${ENERGO_EXTERNAL_CHECK_TOKEN_DATA_LOGGER:-bflmpsvz}
     networks:
       - energo
+    labels:
+      - "energo.logs=true"
     profiles:
       - base
   auditor:
@@ -240,6 +248,8 @@ services:
       MANAGE_API_URL: "http://api:8000"
     networks:
       - energo
+    labels:
+      - "energo.logs=true"
     profiles:
       - base
   notifier:
@@ -263,6 +273,8 @@ services:
       MANAGE_API_URL: "http://api:8000"
     networks:
       - energo
+    labels:
+      - "energo.logs=true"
     profiles:
       - base
   grafana:
@@ -290,6 +302,7 @@ services:
       - "traefik.http.routers.grafana.rule=Host(`grafana.${DOMAIN_SUFFIX:-docker.localhost}`)"
       - "traefik.http.routers.grafana.entrypoints=websecure"
       - "traefik.http.routers.grafana.tls=true"
+      - "energo.logs=true"
     profiles:
       - base
   gatus:
@@ -320,6 +333,7 @@ services:
       - "traefik.http.routers.gatus.rule=Host(`status.${DOMAIN_SUFFIX:-docker.localhost}`)"
       - "traefik.http.routers.gatus.entrypoints=websecure"
       - "traefik.http.routers.gatus.tls=true"
+      - "energo.logs=true"
     profiles:
       - monitoring
   static:
@@ -392,6 +406,37 @@ services:
       - energo
     profiles:
       - monitoring
+  loki:
+    image: grafana/loki:3.7.2
+    container_name: energo-loki
+    restart: unless-stopped
+    command: -config.file=/etc/loki/loki-config.yaml
+    volumes:
+      - ./loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - loki_data:/loki
+    networks:
+      - energo
+    profiles:
+      - monitoring
+  alloy:
+    image: grafana/alloy:v1.17.0
+    container_name: energo-alloy
+    restart: unless-stopped
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    depends_on:
+      - loki
+    volumes:
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - alloy_data:/var/lib/alloy/data
+    networks:
+      - energo
+    profiles:
+      - monitoring
   adminer:
     image: adminer:standalone
     container_name: energo-adminer
@@ -416,6 +461,8 @@ volumes:
   gatus_data:
   prometheus_data:
   static_files:
+  loki_data:
+  alloy_data:
 
 networks:
   energo:

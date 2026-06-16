@@ -1,0 +1,45 @@
+logging {
+  level  = "info"
+  format = "logfmt"
+}
+
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
+discovery.relabel "loki" {
+  targets = discovery.docker.containers.targets
+
+  // opt-in: only collect containers labeled energo.logs=true
+  rule {
+    source_labels = ["__meta_docker_container_label_energo_logs"]
+    regex         = "true"
+    action        = "keep"
+  }
+
+  // container name without the leading slash
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+
+  // compose service name as `service`
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+}
+
+loki.source.docker "containers" {
+  host          = "unix:///var/run/docker.sock"
+  targets       = discovery.relabel.loki.output
+  forward_to    = [loki.write.default.receiver]
+  relabel_rules = discovery.relabel.loki.rules
+}
+
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

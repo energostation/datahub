@@ -54,6 +54,8 @@ services:
       # Middleware chain
       - "traefik.http.routers.config-http.middlewares=config-basicauth@docker"
       - "traefik.http.routers.config-https.middlewares=config-basicauth@docker"
+      # Logging
+      - "energo.logs=true"
     profiles:
       - base
   traefik:
@@ -103,6 +105,7 @@ services:
       - "traefik.http.routers.dashboard.tls=true"
       - "traefik.http.middlewares.dashboard-auth.basicauth.users=${ENERGO__PROXY__HTPASSWD:-energo:missingpasswd}"
       - "traefik.http.routers.dashboard.middlewares=dashboard-auth@docker"
+      - "energo.logs=true"
     profiles:
       - base
 
