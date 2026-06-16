@@ -1,0 +1,18 @@
+apiVersion: 1
+
+# Where alert notifications are delivered. The Slack webhook URL is read from the
+# GF_SLACK_WEBHOOK_URL environment variable (set via ENERGO__GRAFANA__SLACK_WEBHOOK_URL
+# in .env). Provisioned contact points are read-only in the Grafana UI; change the URL
+# by editing .env and restarting the grafana container.
+#
+# title/text are left at Grafana's built-in defaults (default.title / default.message),
+# which already render a readable per-alert summary.
+contactPoints:
+  - orgId: 1
+    name: slack-ops
+    receivers:
+      - uid: slack-ops-recv
+        type: slack
+        settings:
+          url: ${GF_SLACK_WEBHOOK_URL}
+        disableResolveMessage: false

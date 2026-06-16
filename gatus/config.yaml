@@ -11,6 +11,19 @@ ui:
   dark-mode: false
   default-sort-by: group
 
+# Slack alerting. webhook-url is interpolated from the SLACK_WEBHOOK_URL env var
+# (set via ENERGO__GATUS__SLACK_WEBHOOK_URL on the gatus service). If the webhook is
+# empty/unset, Gatus disables the provider and simply doesn't send. default-alert is
+# applied to every endpoint that declares `alerts: - type: slack` below.
+alerting:
+  slack:
+    webhook-url: "${SLACK_WEBHOOK_URL}"
+    default-alert:
+      enabled: true
+      failure-threshold: 3      # 3 consecutive failed checks (~90s at interval 30s) -> alert
+      success-threshold: 2      # 2 consecutive successes -> resolved
+      send-on-resolved: true    # also notify on recovery
+
 endpoints:
   - name: timeseries-database
     group: services
@@ -18,30 +31,40 @@ endpoints:
     interval: 30s
     conditions:
       - "[CONNECTED] == true"
+    alerts:
+      - type: slack
   - name: mqtt-broker
     group: services
     url: "tcp://${MQTT_BROKER_HOST}:1883"
     interval: 30s
     conditions:
       - "[CONNECTED] == true"
+    alerts:
+      - type: slack
   - name: data-api
     group: services
     url: "http://${DATA_API_HOST}:8000/api/v1/data/healthcheck"
     interval: 30s
     conditions:
       - "[STATUS] == 200"
+    alerts:
+      - type: slack
   - name: static
     group: services
     url: "http://${STATIC_HOST}/"
     interval: 30s
     conditions:
       - "[STATUS] == 200"
+    alerts:
+      - type: slack
   - name: grafana
     group: services
     url: "http://${GRAFANA_HOST}:3000/api/health"
     interval: 30s
     conditions:
       - "[STATUS] == 200"
+    alerts:
+      - type: slack
   - name: mqtt-broker-ssl
     group: certificates
     url: "tls://mqtt.${DOMAIN_SUFFIX}:8883"
@@ -50,12 +73,16 @@ endpoints:
       insecure: true
     conditions:
       - "[CERTIFICATE_EXPIRATION] > 96h"
+    alerts:
+      - type: slack
   - name: config
     group: system
     url: "http://${CONFIG_HOST}:5000/healthcheck"
     interval: 30s
     conditions:
       - "[STATUS] == 200"
+    alerts:
+      - type: slack
 
 external-endpoints:
   - name: data-logger
@@ -63,13 +90,19 @@ external-endpoints:
     group: services
     interval: 30s
     token: "${EXTERNAL_CHECK_TOKEN_DATA_LOGGER}"
+    alerts:
+      - type: slack
   - name: data-notifier
     type: EXTERNAL
     group: services
     interval: 30s
     token: "${EXTERNAL_CHECK_TOKEN_DATA_NOTIFIER}"
+    alerts:
+      - type: slack
   - name: data-auditor
     type: EXTERNAL
     group: services
     interval: 30s
     token: "${EXTERNAL_CHECK_TOKEN_DATA_AUDITOR}"
+    alerts:
+      - type: slack

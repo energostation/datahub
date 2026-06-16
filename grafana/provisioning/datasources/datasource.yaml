@@ -1,5 +1,16 @@
 apiVersion: 1
 
+# Loki/Prometheus were originally provisioned without an explicit uid, so the existing
+# grafana_data volume stored them under auto-generated uids. Alert rules reference them
+# by the stable uids `loki`/`prometheus`, so we delete the name-matched datasources first
+# and let the datasources block below recreate them with those uids. deleteDatasources is
+# a no-op on a fresh volume, so this is safe and idempotent on every restart.
+deleteDatasources:
+  - name: Loki
+    orgId: 1
+  - name: Prometheus
+    orgId: 1
+
 datasources:
   - name: TimescaleDB
     type: postgres
@@ -18,6 +29,7 @@ datasources:
       database: "${ENERGO_POSTGRES__DATA_LOGGER__DATABASE}"
   - name: Loki
     type: loki
+    uid: loki
     access: proxy
     url: http://loki:3100
     basicAuth: false
@@ -26,6 +38,7 @@ datasources:
     editable: false
   - name: Prometheus
     type: prometheus
+    uid: prometheus
     orgId: 1
     url: http://prometheus:9090
     basicAuth: false

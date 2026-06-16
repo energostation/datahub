@@ -1,0 +1,286 @@
+apiVersion: 1
+
+# Grafana-managed alert rules, evaluated against the Prometheus (uid: prometheus) and
+# Loki (uid: loki) datasources. Each rule pairs a datasource query (refId A, instant)
+# with a threshold expression (refId C, __expr__); the rule fires when A crosses the
+# threshold for the `for:` duration. All rules route to the slack-ops contact point via
+# the default notification policy.
+#
+# Provisioned rules are read-only in the Grafana UI. Thresholds marked "tune" are
+# starting points — adjust to the deployment's real baseline to avoid noise.
+#
+# Scope note: black-box availability + certificate alerts (service up/down, cert expiry)
+# are owned by Gatus, which alerts to Slack directly. Grafana owns what Gatus can't see:
+# crash loops, resource exhaustion, Postgres internal health, and log-error spikes.
+groups:
+  # ----------------------------------------------------------------------------------
+  - orgId: 1
+    name: container-health
+    folder: DataHub Alerts
+    interval: 1m
+    rules:
+      - uid: container-restarting
+        title: Container restarting (crash loop)
+        condition: C
+        for: 0m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: An energo-* container restarted more than twice in the last 10 minutes.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              range: false
+              editorMode: code
+              expr: changes(container_start_time_seconds{name=~"energo-.*"}[10m])
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [2] }
+
+  # ----------------------------------------------------------------------------------
+  - orgId: 1
+    name: resources
+    folder: DataHub Alerts
+    interval: 1m
+    rules:
+      - uid: container-high-cpu
+        title: Container high CPU
+        condition: C
+        for: 10m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: An energo-* container has used ~1 CPU core or more for 10 minutes.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              range: false
+              editorMode: code
+              expr: sum by (name) (rate(container_cpu_usage_seconds_total{name=~"energo-.*"}[5m]))
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0.9] }
+
+      - uid: container-high-mem
+        title: Container high memory
+        condition: C
+        for: 10m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: An energo-* container RSS exceeded the threshold for 10 minutes.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              range: false
+              editorMode: code
+              expr: container_memory_rss{name=~"energo-.*"}
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              # tune: 1.5 GiB in bytes — set per host capacity / per-container limits
+              conditions:
+                - evaluator: { type: gt, params: [1610612736] }
+
+      - uid: pg-connection-saturation
+        title: PostgreSQL connection saturation
+        condition: C
+        for: 5m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: PostgreSQL is using over 80% of max_connections.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              range: false
+              editorMode: code
+              expr: sum(pg_stat_database_numbackends) / max(pg_settings_max_connections)
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0.8] }
+
+  # ----------------------------------------------------------------------------------
+  - orgId: 1
+    name: postgres-health
+    folder: DataHub Alerts
+    interval: 1m
+    rules:
+      - uid: pg-deadlocks
+        title: PostgreSQL deadlocks
+        condition: C
+        for: 0m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: One or more deadlocks occurred in the last 5 minutes.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              range: false
+              editorMode: code
+              expr: sum(increase(pg_stat_database_deadlocks[5m]))
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+
+      - uid: pg-rollback-spike
+        title: PostgreSQL rollback spike
+        condition: C
+        for: 5m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: Transaction rollback rate is elevated.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              range: false
+              editorMode: code
+              expr: sum(rate(pg_stat_database_xact_rollback[5m]))
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              # tune: rollbacks/sec — depends on workload
+              conditions:
+                - evaluator: { type: gt, params: [1] }
+
+      - uid: pg-low-cache-hit
+        title: PostgreSQL low cache hit ratio
+        condition: C
+        for: 15m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: Shared-buffer cache hit ratio has dropped below 90% for 15 minutes.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              range: false
+              editorMode: code
+              expr: >-
+                sum(rate(pg_stat_database_blks_hit[5m]))
+                /
+                (sum(rate(pg_stat_database_blks_hit[5m])) + sum(rate(pg_stat_database_blks_read[5m])))
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: lt, params: [0.9] }
+
+  # ----------------------------------------------------------------------------------
+  - orgId: 1
+    name: logs
+    folder: DataHub Alerts
+    interval: 1m
+    rules:
+      - uid: log-error-spike
+        title: Log error spike
+        condition: C
+        for: 5m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: An energo-* container logged a burst of error-level lines in the last 5 minutes.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: loki
+            model:
+              refId: A
+              instant: true
+              range: false
+              editorMode: code
+              queryType: instant
+              # Match error-LEVEL lines (logfmt level=error, JSON "level":"error", Python
+              # tracebacks, panics) rather than any line containing the word "error" — the
+              # latter fires on benign log text. Still imperfect across mixed log formats;
+              # tune the regex and threshold to the deployment's real baseline.
+              expr: >-
+                sum by (container) (
+                  count_over_time({container=~"energo-.*"} |~ `(?i)(level=(error|fatal|crit)|"level":"(error|fatal|critical)"|\b(fatal|panic|traceback)\b|\b(error|critical):)` [5m])
+                )
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              # tune: error-level lines per 5m per container. Note Grafana's own container
+              # emits level=error for plugin-signature/update-check noise — raise this or
+              # exclude that container if it proves too chatty.
+              conditions:
+                - evaluator: { type: gt, params: [50] }
