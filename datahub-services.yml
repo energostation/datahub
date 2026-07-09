@@ -41,12 +41,40 @@ services:
       - "energo.logs=true"
     profiles:
       - base
+  migrate:
+    image: migrate/migrate:v4.18.3
+    container_name: energo-migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Applies each database's migrations as the postgres superuser (required for
+    # CREATE EXTENSION, event triggers, and cross-role grants). Runs to
+    # completion and exits; re-running is a no-op when nothing is pending.
+    entrypoint: ["/bin/sh", "/migrate-entrypoint.sh"]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      ENERGO_POSTGRES__MQTT__DATABASE: ${ENERGO_POSTGRES__MQTT__DATABASE:-mqtt}
+      ENERGO_POSTGRES__DATA_LOGGER__DATABASE: ${ENERGO_POSTGRES__DATA_LOGGER__DATABASE:-logger}
+      ENERGO_POSTGRES__DATA_API__DATABASE: ${ENERGO_POSTGRES__DATA_API__DATABASE:-api}
+    volumes:
+      - ./db/migrations:/migrations:ro
+      - ./db/migrate-entrypoint.sh:/migrate-entrypoint.sh:ro
+    networks:
+      - energo
+    restart: "no"
+    labels:
+      - "energo.logs=true"
+    profiles:
+      - base
   mqtt:
     image: vernemq/vernemq:2.1.1
     container_name: energo-mqtt
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
     environment:
       DOCKER_VERNEMQ_ACCEPT_EULA: yes
@@ -105,6 +133,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
     environment:
       DJANGO_SETTINGS_MODULE: ${ENERGO__DATA_API__SETTINGS:-datapi.settings.production}
@@ -207,6 +237,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       mqtt:
         condition: service_started
     restart: unless-stopped
@@ -233,6 +265,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       mqtt:
         condition: service_started
     restart: unless-stopped
@@ -258,6 +292,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       mqtt:
         condition: service_started
     restart: unless-stopped
@@ -283,6 +319,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
     environment:
       GF_SECURITY_ADMIN_USER: admin
@@ -360,6 +398,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
     environment:
       DATA_SOURCE_URI: "postgres:5432/postgres?sslmode=disable"
@@ -382,6 +422,10 @@ services:
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
       - /dev/disk/:/dev/disk:ro
+      # host root is btrfs on /dev/mapper/root; cadvisor stats the device to read
+      # btrfs mountpoint IDs, so expose the device-mapper symlinks (else it spams
+      # "Unable to get btrfs mountpoint IDs: stat failed on /dev/mapper/root")
+      - /dev/mapper:/dev/mapper:ro
     networks:
       - energo
     profiles:

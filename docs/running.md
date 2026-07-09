@@ -8,7 +8,7 @@ The project uses two compose files, each with named profiles:
 |---|---|---|
 | `datahub-core.yml` | `config` | `config-make` (one-time init) |
 | `datahub-core.yml` | `base` | Traefik (reverse proxy), config UI |
-| `datahub-services.yml` | `base` | postgres, mqtt, api, app, datalogger, auditor, notifier, grafana, static, collectstatic |
+| `datahub-services.yml` | `base` | postgres, migrate, mqtt, api, app, datalogger, auditor, notifier, grafana, static, collectstatic |
 | `datahub-services.yml` | `monitoring` | gatus, prometheus, exporter-postgres |
 | `datahub-services.yml` | `debug` | adminer |
 
@@ -38,6 +38,31 @@ docker compose -f datahub-services.yml --profile=base --profile=monitoring --pro
 ```
 
 Additionally starts: Adminer.
+
+## Database migrations
+
+The one-shot `migrate` service ([golang-migrate](https://github.com/golang-migrate/migrate))
+runs automatically as part of the `base` profile. On every `up` it applies any pending
+migrations from `db/migrations/<database>/` (one folder per database) as the postgres
+superuser, then exits. Services that use the database wait for it to finish
+(`depends_on: migrate: condition: service_completed_successfully`), so a failed migration
+blocks the rollout instead of starting services against a half-migrated schema.
+
+The databases and roles themselves are still created once by `db/init/energo-setup.sh`
+(cluster bootstrap); migrations own all schema inside those databases.
+
+**Adding a migration:**
+
+```shell
+# create the next version pair for a database (e.g. logger)
+db/migrations/logger/00000N_<title>.up.sql     # forward change
+db/migrations/logger/00000N_<title>.down.sql   # reverse change
+```
+
+Keep migrations idempotent (`... IF EXISTS`, `CREATE OR REPLACE`,
+`CREATE EXTENSION IF NOT EXISTS`, `GRANT`) so re-runs and first-time runs against an
+already-provisioned instance are safe no-ops. They take effect on the next
+`docker compose ... up` (or the next `datahub-services.service` restart).
 
 ## Service endpoints (via domain name)
 
