@@ -334,6 +334,16 @@ services:
       ENERGO_POSTGRES__GRAFANA__USERNAME: ${ENERGO_POSTGRES__GRAFANA__USERNAME:-grafana}
       ENERGO_POSTGRES__GRAFANA__PASSWORD: ${ENERGO_POSTGRES__GRAFANA__PASSWORD:-grafana}
       GF_SLACK_WEBHOOK_URL: ${ENERGO__GRAFANA__SLACK_WEBHOOK_URL:-http://slack/webhook}
+      # Public address Grafana builds absolute URLs from (OAuth callbacks, email
+      # links, sub-path redirects). Defaults to the DOMAIN_SUFFIX-derived host the
+      # bundled Traefik router serves; override when an external proxy exposes
+      # Grafana under a different hostname.
+      GF_SERVER_DOMAIN: ${ENERGO__GRAFANA__DOMAIN:-grafana.${DOMAIN_SUFFIX:-docker.localhost}}
+      GF_SERVER_ROOT_URL: ${ENERGO__GRAFANA__ROOT_URL:-https://grafana.${DOMAIN_SUFFIX:-docker.localhost}/}
+      # Trust the proxy's forwarded host header for CSRF origin checks, so a
+      # dynamic/unknown public hostname behind an external proxy still validates.
+      GF_SECURITY_CSRF_TRUSTED_ORIGINS: ${ENERGO__GRAFANA__CSRF_TRUSTED_ORIGINS:-https://grafana.${DOMAIN_SUFFIX:-docker.localhost}}
+      GF_SECURITY_CSRF_ADDITIONAL_HEADERS: X-Real-Host
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
@@ -430,6 +440,23 @@ services:
       # btrfs mountpoint IDs, so expose the device-mapper symlinks (else it spams
       # "Unable to get btrfs mountpoint IDs: stat failed on /dev/mapper/root")
       - /dev/mapper:/dev/mapper:ro
+    networks:
+      - energo
+    profiles:
+      - monitoring
+  node-exporter:
+    image: prom/node-exporter:v1.12.1
+    container_name: energo-node-exporter
+    restart: unless-stopped
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro,rslave
     networks:
       - energo
     profiles:

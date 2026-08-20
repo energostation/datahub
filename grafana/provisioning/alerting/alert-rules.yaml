@@ -284,3 +284,109 @@ groups:
               # exclude that container if it proves too chatty.
               conditions:
                 - evaluator: { type: gt, params: [50] }
+
+  # ----------------------------------------------------------------------------------
+  # Host-level resource exhaustion, from node-exporter (job="node"). Gatus/Grafana see
+  # containers; this group watches the underlying Docker host that runs them. Metrics
+  # are reported host-absolute because node-exporter runs with --path.rootfs=/rootfs.
+  - orgId: 1
+    name: host-resources
+    folder: DataHub Alerts
+    interval: 1m
+    rules:
+      - uid: host-disk-almost-full
+        title: Host disk almost full
+        condition: C
+        for: 5m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: The host root filesystem is over 90% full.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              range: false
+              editorMode: code
+              expr: >-
+                1 - (
+                  node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs",mountpoint="/"}
+                  /
+                  node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs",mountpoint="/"}
+                )
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              # tune: fraction used — 0.9 = 90% full
+              conditions:
+                - evaluator: { type: gt, params: [0.9] }
+
+      - uid: host-high-load
+        title: Host high load average
+        condition: C
+        for: 10m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: Host 5-minute load average has exceeded 1.5x the CPU core count for 10 minutes.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              range: false
+              editorMode: code
+              # scalar() so the per-core divisor (label-less) still divides the
+              # instance-labelled node_load5 instead of failing vector matching
+              expr: node_load5 / scalar(count(count(node_cpu_seconds_total) by (cpu)))
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              # tune: load per core — 1.5 = sustained over-subscription
+              conditions:
+                - evaluator: { type: gt, params: [1.5] }
+
+      - uid: host-low-memory
+        title: Host low available memory
+        condition: C
+        for: 5m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: Less than 10% of host memory is available.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              range: false
+              editorMode: code
+              expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              # tune: fraction available — 0.1 = 10% free
+              conditions:
+                - evaluator: { type: lt, params: [0.1] }
