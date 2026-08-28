@@ -311,6 +311,7 @@ services:
       EXTERNAL_CHECK_TOKEN: ${ENERGO_EXTERNAL_CHECK_TOKEN_DATA_NOTIFIER:-bflmpsvz}
       MANAGE_API_TOKEN: ${ENERGO__DATA_API__MANAGE_API_TOKEN:-secretmanagetoken}
       MANAGE_API_URL: "http://api:8000"
+      LOG_LEVEL: DEBUG
     networks:
       - energo
     labels:
