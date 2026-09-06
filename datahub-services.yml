@@ -128,7 +128,7 @@ services:
     profiles:
       - base
   api:
-    image: test-dcreg.icool.cloud/data-api:v2168
+    image: test-dcreg.icool.cloud/data-api:v2194
     container_name: energo-api
     depends_on:
       postgres:
@@ -160,6 +160,8 @@ services:
       GRAFANA_ADMIN_USER: ${ENERGO__DATA_API__GRAFANA_ADMIN_USER:-admin}
       GRAFANA_ADMIN_PASSWORD: ${ENERGO__DATA_API__GRAFANA_ADMIN_PASSWORD:-admin}
       GRAFANA_FERNET_KEY: ${ENERGO__DATA_API__GRAFANA_FERNET_KEY:-}
+      REPORTS_DOWNLOAD_SECRET: ${ENERGO__DATA_API__REPORTS_DOWNLOAD_SECRET:-secretdownloadkey}
+      REPORTS_DOWNLOAD_BASE_URL: ${ENERGO__DATA_API__REPORTS_DOWNLOAD_BASE_URL:-https://share.${DOMAIN_SUFFIX}:-docker.localhost}
     networks:
       - energo
     healthcheck:
