@@ -390,3 +390,143 @@ groups:
               # tune: fraction available — 0.1 = 10% free
               conditions:
                 - evaluator: { type: lt, params: [0.1] }
+
+  # ----------------------------------------------------------------------------------
+  # VerneMQ broker internals, from the broker's own /metrics endpoint (job="vernemq").
+  # Gatus already owns broker up/down (tcp://mqtt:1883) and MQTTS cert expiry, so this
+  # group deliberately carries no "broker down" rule — only the things a TCP probe
+  # cannot see: who is connected, whether telemetry is still flowing, auth rejections,
+  # and queue back-pressure.
+  - orgId: 1
+    name: mqtt-health
+    folder: DataHub Alerts
+    interval: 1m
+    rules:
+      - uid: mqtt-subscribers-missing
+        title: MQTT subscriber disconnected
+        condition: C
+        for: 5m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: Fewer MQTT clients are connected to VerneMQ than the always-on subscriber services.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              range: false
+              editorMode: code
+              expr: vernemq_active_mqtt_connections
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              # tune: datalogger, auditor and notifier hold permanent sessions, so a
+              # healthy broker never drops below 3. Raise if more always-on clients
+              # (PLCs, the API) are expected to stay connected.
+              conditions:
+                - evaluator: { type: lt, params: [3] }
+
+      - uid: mqtt-ingest-stalled
+        title: MQTT telemetry ingest stalled
+        condition: C
+        for: 15m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: critical
+        annotations:
+          summary: VerneMQ has received no PUBLISH packets for 15 minutes — PLC telemetry has stopped.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              range: false
+              editorMode: code
+              # summed across the mqtt_version label, which splits the counter per
+              # protocol level (PLCs connect as v4, some tooling as v5)
+              expr: sum(rate(vernemq_mqtt_publish_received[10m]))
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              # tune: publishes/sec. The epsilon stands in for "== 0"; raise it to a
+              # real floor once the deployment's steady-state PLC rate is known, and
+              # disable this rule on installations with no PLCs attached yet.
+              conditions:
+                - evaluator: { type: lt, params: [0.001] }
+
+      - uid: mqtt-auth-failures
+        title: MQTT authentication failures
+        condition: C
+        for: 5m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: VerneMQ is rejecting MQTT connections — wrong PLC credentials, an expired ACL entry, or an unauthorized client probing the broker.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              range: false
+              editorMode: code
+              expr: >-
+                sum(rate(vernemq_mqtt_connack_not_authorized_sent[5m]))
+                + sum(rate(vernemq_mqtt_connack_bad_credentials_sent[5m]))
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              # tune: rejections/sec. Any sustained rejection is worth a look, so this
+              # is effectively "> 0"; raise it if PLCs are expected to retry noisily.
+              conditions:
+                - evaluator: { type: gt, params: [0.001] }
+
+      - uid: mqtt-queue-drops
+        title: MQTT queue dropping messages
+        condition: C
+        for: 5m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: critical
+        annotations:
+          summary: VerneMQ is discarding queued messages — a subscriber is too slow or its queue is full, so telemetry is being lost.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              range: false
+              editorMode: code
+              expr: sum(rate(vernemq_queue_message_drop[5m]))
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              # tune: dropped messages/sec — effectively "> 0"; any drop is data loss
+              conditions:
+                - evaluator: { type: gt, params: [0.001] }
