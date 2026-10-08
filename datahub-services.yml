@@ -188,7 +188,7 @@ services:
     profiles:
       - base
   app:
-    image: test-dcreg.icool.cloud/data-app:v2276
+    image: test-dcreg.icool.cloud/data-app:v2317
     container_name: energo-app
     restart: unless-stopped
     networks:
