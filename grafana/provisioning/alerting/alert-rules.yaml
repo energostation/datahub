@@ -530,3 +530,50 @@ groups:
               # tune: dropped messages/sec — effectively "> 0"; any drop is data loss
               conditions:
                 - evaluator: { type: gt, params: [0.001] }
+
+  # ----------------------------------------------------------------------------------
+  # data-api's own /metrics endpoint (job="data-api"). Gatus already owns API up/down,
+  # so this group only carries what a probe cannot see. data-api INSERTs report runs
+  # and data-reporter claims them; the oldest-queued age is computed from the run table
+  # on every scrape, so it rises steadily whenever data-reporter stops claiming work —
+  # whether data-reporter is down, wedged, or failing before it marks a run running.
+  - orgId: 1
+    name: data-api
+    folder: DataHub Alerts
+    interval: 1m
+    rules:
+      - uid: report-queue-stalled
+        title: Report queue stalled
+        condition: C
+        for: 5m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: A report run has been waiting in the queue for over 15 minutes — data-reporter is not claiming work, so scheduled reports are not being generated or sent.
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              range: false
+              editorMode: code
+              # 0 when nothing is queued, so an idle system never fires. NoData means
+              # the scrape failed or data-api's reports collector errored (see
+              # datapi_metrics_collector_errors_total on the Data API dashboard).
+              expr: max(datapi_report_oldest_queued_run_age_seconds{job="data-api"})
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              # tune: seconds. Matches the red threshold on the Data API dashboard.
+              # Lower it if data-reporter's poll interval is short and reports are
+              # time-critical; raise it if large reports routinely queue behind each
+              # other.
+              conditions:
+                - evaluator: { type: gt, params: [900] }

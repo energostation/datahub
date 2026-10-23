@@ -28,4 +28,11 @@ scrape_configs:
         regex: 'VerneMQ@.*'
         target_label: node
         replacement: 'mqtt'
-
+  - job_name: data-api
+    metrics_path: /metrics
+    scheme: http
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/data-api.token
+    static_configs:
+      - targets: ["api:8000"]

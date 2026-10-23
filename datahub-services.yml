@@ -128,7 +128,7 @@ services:
     profiles:
       - base
   api:
-    image: test-dcreg.icool.cloud/data-api:v2273
+    image: test-dcreg.icool.cloud/data-api:v2397
     container_name: energo-api
     depends_on:
       postgres:
@@ -162,6 +162,7 @@ services:
       GRAFANA_FERNET_KEY: ${ENERGO__DATA_API__GRAFANA_FERNET_KEY:-}
       REPORTS_DOWNLOAD_SECRET: ${ENERGO__DATA_API__REPORTS_DOWNLOAD_SECRET:-secretdownloadkey}
       REPORTS_DOWNLOAD_BASE_URL: ${ENERGO__DATA_API__REPORTS_DOWNLOAD_BASE_URL:-https://share.${DOMAIN_SUFFIX}:-docker.localhost}
+      METRICS_TOKEN: ${ENERGO__DATA_API__METRICS_TOKEN:-secretmetricstoken}
     networks:
       - energo
     healthcheck:
@@ -188,7 +189,7 @@ services:
     profiles:
       - base
   app:
-    image: test-dcreg.icool.cloud/data-app:v2317
+    image: test-dcreg.icool.cloud/data-app:v2272
     container_name: energo-app
     restart: unless-stopped
     networks:
@@ -468,16 +469,13 @@ services:
     image: prom/prometheus:v3.7.1
     container_name: energo-prometheus
     restart: unless-stopped
-#    environment:
-#      POSTGRES_HOST: postgres
     volumes:
       - ./prometheus/prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
       - prometheus_data:/prometheus
-#    entrypoint: |
-#      sh -c '
-#        envsubst < /etc/prometheus/prometheus.yml.template > /etc/prometheus/prometheus.yml &&
-#        exec /bin/prometheus
-#      '
+    configs:
+      - source: prometheus-data-api-token
+        target: /etc/prometheus/data-api.token
+        mode: 0444
     command:
       - '--config.file=/etc/prometheus/prometheus.yaml'
       - '--storage.tsdb.path=/prometheus'
@@ -543,6 +541,11 @@ volumes:
   static_files:
   loki_data:
   alloy_data:
+
+configs:
+  # default must match the api service's METRICS_TOKEN default
+  prometheus-data-api-token:
+    content: ${ENERGO__DATA_API__METRICS_TOKEN:-secretmetricstoken}
 
 networks:
   energo:
