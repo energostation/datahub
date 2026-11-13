@@ -8,9 +8,10 @@ The project uses two compose files, each with named profiles:
 |---|---|---|
 | `datahub-core.yml` | `config` | `config-make` (one-time init) |
 | `datahub-core.yml` | `base` | Traefik (reverse proxy), config UI |
-| `datahub-services.yml` | `base` | postgres, migrate, mqtt, api, app, datalogger, auditor, notifier, grafana, static, collectstatic |
+| `datahub-services.yml` | `base` | postgres, migrate, mqtt, api, app, datalogger, auditor, notifier, grafana, static, collectstatic, scheduler |
 | `datahub-services.yml` | `monitoring` | gatus, prometheus, exporter-postgres |
 | `datahub-services.yml` | `debug` | adminer |
+| `datahub-services.yml` | `jobs` | one-shot scheduled jobs (backup), never started by `up`, see [Scheduled jobs](scheduler.md) |
 
 ## Starting services
 

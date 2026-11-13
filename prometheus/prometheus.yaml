@@ -28,4 +28,6 @@ scrape_configs:
         regex: 'VerneMQ@.*'
         target_label: node
         replacement: 'mqtt'
-
+  - job_name: 'scheduler'
+    static_configs:
+      - targets: ["scheduler:9746"]

@@ -4,3 +4,4 @@ ssl/
 !ssl/mqtt/placeholder
 !ssl/proxy/placeholder
 config-backups/
+backups/

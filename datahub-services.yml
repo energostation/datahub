@@ -128,7 +128,7 @@ services:
     profiles:
       - base
   api:
-    image: test-dcreg.icool.cloud/data-api:v2273
+    image: test-dcreg.icool.cloud/data-api:v2475
     container_name: energo-api
     depends_on:
       postgres:
@@ -136,7 +136,7 @@ services:
       migrate:
         condition: service_completed_successfully
     restart: unless-stopped
-    environment:
+    environment: &api-env  # reused by the prune-push-devices job
       DJANGO_SETTINGS_MODULE: ${ENERGO__DATA_API__SETTINGS:-datapi.settings.production}
       ALLOWED_HOST: api.${DOMAIN_SUFFIX:-docker.localhost}
       SECRET_KEY: ${ENERGO__DATA_API__SECRET_KEY:-secret}
@@ -162,6 +162,7 @@ services:
       GRAFANA_FERNET_KEY: ${ENERGO__DATA_API__GRAFANA_FERNET_KEY:-}
       REPORTS_DOWNLOAD_SECRET: ${ENERGO__DATA_API__REPORTS_DOWNLOAD_SECRET:-secretdownloadkey}
       REPORTS_DOWNLOAD_BASE_URL: ${ENERGO__DATA_API__REPORTS_DOWNLOAD_BASE_URL:-https://share.${DOMAIN_SUFFIX}:-docker.localhost}
+      TIME_ZONE: ${ENERGO_TZ:-Europe/Prague}
     networks:
       - energo
     healthcheck:
@@ -238,7 +239,7 @@ services:
     profiles:
       - base
   datalogger:
-    image: test-dcreg.icool.cloud/data-logger:v2255
+    image: test-dcreg.icool.cloud/data-logger:v2461
     container_name: energo-datalogger
     depends_on:
       postgres:
@@ -259,6 +260,7 @@ services:
       DATABASE_PASS: ${ENERGO_POSTGRES__DATA_LOGGER__PASSWORD:-logger}
       EXTERNAL_CHECK_URL: "http://gatus:8080/api/v1/endpoints/services_data-logger/external"
       EXTERNAL_CHECK_TOKEN: ${ENERGO_EXTERNAL_CHECK_TOKEN_DATA_LOGGER:-bflmpsvz}
+      LOG_LEVEL: INFO
     networks:
       - energo
     labels:
@@ -266,7 +268,7 @@ services:
     profiles:
       - base
   auditor:
-    image: test-dcreg.icool.cloud/data-auditor:v1669
+    image: test-dcreg.icool.cloud/data-auditor:v2457
     container_name: energo-auditor
     depends_on:
       postgres:
@@ -293,7 +295,7 @@ services:
     profiles:
       - base
   notifier:
-    image: test-dcreg.icool.cloud/data-notifier:v2015
+    image: test-dcreg.icool.cloud/data-notifier:v2458
     container_name: energo-notifier
     depends_on:
       postgres:
@@ -531,6 +533,38 @@ services:
       - "traefik.http.routers.adminer.tls=true"
     profiles:
       - debug
+  scheduler:
+    image: test-dcreg.icool.cloud/data-cron:v2449
+    container_name: energo-scheduler
+    restart: unless-stopped
+    environment:
+      TZ: ${ENERGO_TZ:-Europe/Prague}
+      DATAHUB_DIR: ${ENERGO__SCHEDULER__HOST_DIR:-/srv/datahub}
+    volumes:
+      # Mounted at the host's own path so relative bind mounts of job services resolve correctly.
+      - ./:${ENERGO__SCHEDULER__HOST_DIR:-/srv/datahub}:ro
+      - ./scheduler:/etc/scheduler:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - energo
+    labels:
+      - "energo.logs=true"
+    profiles:
+      - base
+
+  # --- Scheduled jobs (profile `jobs`): never started by `up`, run by the scheduler ---
+  # Deletes push devices (FCM tokens) not seen for --days (default 270 = FCM inactivity expiry).
+  prune-push-devices:
+    image: test-dcreg.icool.cloud/data-api:v2475
+    restart: "no"
+    command: prune_push_devices
+    environment: *api-env
+    networks:
+      - energo
+    labels:
+      - "energo.logs=true"
+    profiles:
+      - jobs
 
 volumes:
   pg_data:
