@@ -1,0 +1,10 @@
+# DataHub scheduled jobs (supercronic syntax = standard 5-field cron, optional 6th/7th field).
+# Times are in the scheduler's TZ (ENERGO__SCHEDULER__TZ, default UTC).
+# Each line starts a one-shot service from the `jobs` profile of datahub-services.yml.
+# The file is watched; edits are picked up without restarting the scheduler.
+#
+# min hour dom mon dow  command
+
+
+# Delete push devices not seen for 270 days (FCM token expiry)
+0 3 * * *   run-job prune-push-devices

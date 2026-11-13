@@ -9,6 +9,7 @@ Everything runs as Docker Compose services managed by systemd.
 - [Setup](docs/setup.md) — prerequisites, SSL certificates, environment variables, initial config generation
 - [Running services](docs/running.md) — compose profiles, service endpoints, direct port access
 - [Systemd](docs/systemd.md) — installing and managing systemd units, hot-reload mechanism
+- [Scheduled jobs](docs/scheduler.md) — cron-like jobs (scheduler service, `jobs` profile), database backups
 - [MQTT](docs/mqtt.md) — topic/payload format, PLC client setup, publishing data
 - [Hardware](docs/hardware.md) — resource drivers, sizing tiers, storage and network requirements
 - [DataHub VM](docs/datahub-vm.md) — pre-installed Debian VM image, networking, exposed ports, certificates
@@ -48,6 +49,7 @@ HTTPS :443 (Traefik) → api (Django REST)
 | prometheus | `prom/prometheus` | Metrics collection (monitoring profile) |
 | exporter-postgres | `postgres-exporter` | PostgreSQL metrics for Prometheus (monitoring profile) |
 | adminer | `adminer` | Database management UI (debug profile) |
+| scheduler | `data-cron` | Cron-like scheduler for services in the `jobs` profile |
 
 ## Accessing services
 
@@ -83,4 +85,4 @@ Enable port bindings using the `*.ports.yml` override files (see [Running servic
 
 ## TODO
 
-- Backups
+- Off-host copies of backups
